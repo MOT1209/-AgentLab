@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { MockDevice } from "../src/device/mock-device.js";
+import { createMockFleet } from "../src/device/mock-device.js";
+import { DeviceManager } from "../src/runtime/device-manager.js";
 import { AgentRegistry } from "../src/agents/registry.js";
 import { AgentFactory } from "../src/agents/factory.js";
 import { CANONICAL_DEFINITIONS } from "../src/agents/organization.js";
@@ -11,7 +12,7 @@ const def = (id: string) => CANONICAL_DEFINITIONS.find((d) => d.id === id)!;
 
 function factory(behaviors = {}) {
   const registry = new AgentRegistry();
-  return { registry, factory: new AgentFactory({ device: new MockDevice(), registry, behaviors }) };
+  return { registry, factory: new AgentFactory({ devices: new DeviceManager(), registry, behaviors }) };
 }
 
 test("registry rejects duplicates, orphan subs, parented mains, bad kinds, sub-of-sub", () => {
@@ -63,17 +64,17 @@ test("behavior table must reference existing SUB agents only", () => {
 });
 
 test("initializeAgentLab builds the full validated runtime", () => {
-  const rt = initializeAgentLab({ device: new MockDevice() });
+  const rt = initializeAgentLab({ devices: createMockFleet(12) });
   assert.equal(rt.agents.length, 36);
   assert.equal(rt.registry.size, 36);
   assert.ok(Object.values(rt.registry.statuses()).every((s) => s === "IDLE"));
   assert.throws(
-    () => initializeAgentLab({ device: new MockDevice(), behaviors: { "MAIN-42-A": {} } }),
+    () => initializeAgentLab({ devices: createMockFleet(12), behaviors: { "MAIN-42-A": {} } }),
     /unknown agent/,
   );
 });
 
 test("initializeAgentLab with custom definitions skips the 12/24 rule", () => {
-  const rt = initializeAgentLab({ device: new MockDevice(), definitions: [def("MAIN-01"), def("MAIN-01-A")] });
+  const rt = initializeAgentLab({ devices: createMockFleet(12), definitions: [def("MAIN-01"), def("MAIN-01-A")] });
   assert.equal(rt.registry.size, 2);
 });

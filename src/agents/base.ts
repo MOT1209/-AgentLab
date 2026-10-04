@@ -1,9 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { Device } from "../device/types.js";
 import { AgentResult, Priority, Task } from "./types.js";
 
 export abstract class Agent {
-  constructor(readonly id: string, protected readonly device: Device) {}
+  constructor(readonly id: string) {}
 
   /** Specialized work. May throw; run() isolates failures. */
   protected abstract execute(task: Task): Promise<AgentResult>;

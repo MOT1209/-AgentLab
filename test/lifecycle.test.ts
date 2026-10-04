@@ -37,8 +37,9 @@ test("a busy agent refuses a second task", async () => {
   let release!: () => void;
   const gate = new Promise<void>((r) => (release = r));
   const slow: TaskHandler = { requires: [], handle: async () => (await gate, { status: "PASSED", summary: "", evidence: [] }) };
-  const { registry } = lab({ behaviors: { "MAIN-03-A": { slow } } });
+  const { registry, devices } = lab({ behaviors: { "MAIN-03-A": { slow } } });
   const sub = registry.require("MAIN-03-A");
+  assert.ok(devices.lock("DEVICE-03", { id: "MAIN-03", type: "AGENT" }).ok); // sub-agents run under their parent's lease
 
   const first = sub.run(newTask(sub.id, "slow", {}));
   assert.equal(sub.status, "EXECUTING");

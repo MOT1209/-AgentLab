@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { Device, DeviceError, DeviceInfo, DeviceState } from "./types.js";
+import { Device, DeviceError, DeviceInfo, DeviceSource, DeviceState } from "./types.js";
 
 const run = promisify(execFile);
 const PKG = /^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$/;
@@ -10,6 +10,10 @@ export class AdbDevice implements Device {
   private lastState: DeviceState = "CONNECTING";
 
   constructor(readonly id: string, private readonly adbPath = "adb") {}
+
+  get source(): DeviceSource {
+    return adbSourceOf(this.id);
+  }
 
   state(): DeviceState {
     return this.lastState;
@@ -62,4 +66,11 @@ export class AdbDevice implements Device {
   async logs(lines = 200): Promise<string> {
     return String(await this.adb(["logcat", "-d", "-t", String(lines)]));
   }
+}
+
+/** emulator-5554 -> EMULATOR, 192.168.1.5:5555 -> REMOTE, anything else -> PHYSICAL. */
+export function adbSourceOf(serial: string): DeviceSource {
+  if (serial.startsWith("emulator-")) return "EMULATOR";
+  if (serial.includes(":")) return "REMOTE";
+  return "PHYSICAL";
 }

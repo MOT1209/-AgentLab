@@ -1,5 +1,9 @@
 export type DeviceState = "ONLINE" | "OFFLINE" | "BUSY" | "ERROR" | "CONNECTING" | "MAINTENANCE";
 
+/** Where a device comes from. Agents never branch on this; the runtime uses it for reporting and filtering. */
+export const DEVICE_SOURCES = ["PHYSICAL", "EMULATOR", "REMOTE", "MOCK"] as const;
+export type DeviceSource = (typeof DEVICE_SOURCES)[number];
+
 export interface DeviceInfo {
   id: string;
   model: string;
@@ -8,6 +12,8 @@ export interface DeviceInfo {
 
 export interface Device {
   readonly id: string;
+  /** Provenance, if the adapter knows it. */
+  readonly source?: DeviceSource;
   state(): DeviceState;
   info(): Promise<DeviceInfo>;
   install(apkPath: string): Promise<void>;

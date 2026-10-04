@@ -17,3 +17,11 @@ Format: date — decision — reason
 - Only MAIN agents accept orchestrator dispatch; SUB agents receive work from their parent only.
 - Children run sequentially because they share one device.
 - Canonical 12/24 rule is enforced by validateOrganization at bootstrap; custom definitions skip it.
+- Phase 3: a device is a runtime resource; the only link to an agent is AgentAssignment (agentId, deviceId). Assignment is runtime data, never in AgentDefinition.
+- One device per MAIN; devices are exclusive (one assignment per device). Sub-agents inherit via their parent and never lease on their own.
+- Lock state (FREE/LEASED/BUSY) is separate from hardware DeviceState. Lease release returns the device to FREE.
+- Lease acquisition is synchronous (no await between check and set), so concurrent async callers cannot double-allocate. Contention returns a result object, it does not throw.
+- TTL is optional and lazily enforced; a BUSY lease (task running) is never expired.
+- MAIN agent flow: PLANNING -> device assigned? -> checkHealth -> withLease (BUSY) -> delegate -> release. Failures at any step are BLOCKED, not ERROR.
+- Sub-agent handlers are BLOCKED if no active parent lease exists or the device lacks a required device capability.
+- initializeAgentLab requires devices or a DeviceManager: there is deliberately no implicit mock fleet, so a misconfigured production run cannot silently pass on mocks.

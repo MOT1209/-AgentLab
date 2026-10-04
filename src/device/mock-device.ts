@@ -6,6 +6,7 @@ export class MockDevice implements Device {
   private installed = new Set<string>();
   private running = new Set<string>();
   readonly calls: string[] = [];
+  readonly source = "MOCK" as const;
 
   constructor(readonly id = "mock-1") {}
 
@@ -52,4 +53,9 @@ export class MockDevice implements Device {
   isRunning(pkg: string): boolean {
     return this.running.has(pkg);
   }
+}
+
+/** Canonical development fleet: DEVICE-01 ... DEVICE-NN. */
+export function createMockFleet(count = 12, prefix = "DEVICE"): MockDevice[] {
+  return Array.from({ length: count }, (_, i) => new MockDevice(`${prefix}-${String(i + 1).padStart(2, "0")}`));
 }

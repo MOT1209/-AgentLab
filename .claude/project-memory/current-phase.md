@@ -1,13 +1,16 @@
 # CURRENT PHASE
 
-Phase 2 — Agent architecture done (26 tests pass, typecheck clean).
-Config-driven framework in src/agents/: definitions, capabilities, organization (12 MAIN + 24 SUB, ids MAIN-NN / MAIN-NN-A|B),
-validation, AgentRegistry, AgentFactory, ManagedAgent/MainAgent/SubAgent, MessageBus, aggregate, behaviors.
-Entry point: initializeAgentLab() in src/bootstrap.ts. Orchestrator dispatches to MAIN agents only.
+Phase 3 — Device runtime done (52 tests pass, typecheck clean).
+src/runtime/: DeviceRegistry, DevicePool (leases), DeviceManager (assignments, health, discovery, withLease), RuntimeContext.
+Agents no longer hold a Device: AgentDeps.devices is a DeviceManager. MAIN agents lease their assigned device per task;
+sub-agents run under the parent's lease and see it via HandlerContext.device / runtime.
+initializeAgentLab({ devices | deviceManager, assignments: "auto" | "none" | Record }) — no implicit mock fleet.
+createMockFleet(12) gives DEVICE-01..12 for development.
 
 ## Next
-- Validate AdbDevice on a real device/emulator (still untested)
+- Validate AdbDevice and AdbDiscovery on a real device/emulator (still untested; only the parser is unit-tested)
 - Real behaviors for more SUB agents (only MAIN-01-B "smoke" exists; the other 23 report BLOCKED)
-- Device lock so concurrent MAIN agents don't share one device unsafely
-- Persistence for tasks/evidence/messages
+- Clear logcat before launch; crash detection beyond regex
+- Persistence for tasks/evidence/messages/leases
+- Dynamic device allocation (MAIN without a fixed device takes any free one) if 12 physical devices are unrealistic
 - API layer + dashboard (later)

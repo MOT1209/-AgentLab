@@ -1,4 +1,6 @@
-import { Device } from "../device/types.js";
+import type { Device } from "../device/types.js";
+import type { DeviceManager } from "../runtime/device-manager.js";
+import type { RuntimeContext } from "../runtime/types.js";
 import { Agent } from "./base.js";
 import type { Capability } from "./capabilities.js";
 import { AgentDefinition, AgentStatus, BUSY_STATUSES } from "./definitions.js";
@@ -7,14 +9,16 @@ import type { AgentRegistry } from "./registry.js";
 import type { AgentResult, Task } from "./types.js";
 
 export interface AgentDeps {
-  device: Device;
+  devices: DeviceManager;
   registry: AgentRegistry;
   bus: MessageBus;
 }
 
 export interface HandlerContext {
   task: Task;
+  /** The device assigned to this agent's MAIN agent. Exclusively leased for the duration of the task. */
   device: Device;
+  runtime: RuntimeContext;
   definition: AgentDefinition;
 }
 
@@ -35,7 +39,7 @@ export abstract class ManagedAgent extends Agent {
     readonly definition: AgentDefinition,
     protected readonly deps: AgentDeps,
   ) {
-    super(definition.id, deps.device);
+    super(definition.id);
   }
 
   get kind() {
@@ -43,6 +47,16 @@ export abstract class ManagedAgent extends Agent {
   }
   get status(): AgentStatus {
     return this.current;
+  }
+
+  /** The MAIN agent whose device assignment this agent works under (itself, for a MAIN agent). */
+  protected get rootMainId(): string {
+    return this.definition.kind === "MAIN" ? this.id : (this.definition.parentId as string);
+  }
+
+  /** Defined only while the root MAIN agent holds an active lease on its assigned device. */
+  protected runtimeContext(): RuntimeContext | undefined {
+    return this.deps.devices.contextFor(this.rootMainId, this.id);
   }
 
   /** True if this agent (or, for MAIN, one of its children) can handle the task type. */
