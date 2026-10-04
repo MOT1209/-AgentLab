@@ -1,5 +1,7 @@
 import type { Device } from "../device/types.js";
 import type { DeviceManager } from "../runtime/device-manager.js";
+import type { ProviderManager } from "../providers/manager.js";
+import type { LlmProvider } from "../providers/types.js";
 import type { RuntimeContext } from "../runtime/types.js";
 import { Agent } from "./base.js";
 import type { Capability } from "./capabilities.js";
@@ -10,6 +12,8 @@ import type { AgentResult, Task } from "./types.js";
 
 export interface AgentDeps {
   devices: DeviceManager;
+  /** Optional. Without it, handlers get no `llm` and must work deterministically. */
+  providers?: ProviderManager;
   registry: AgentRegistry;
   bus: MessageBus;
 }
@@ -19,6 +23,8 @@ export interface HandlerContext {
   /** The device assigned to this agent's MAIN agent. Exclusively leased for the duration of the task. */
   device: Device;
   runtime: RuntimeContext;
+  /** The LLM provider routed to this agent (its own override, its MAIN's, or the default). */
+  llm?: LlmProvider;
   definition: AgentDefinition;
 }
 

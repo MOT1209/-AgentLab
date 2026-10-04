@@ -10,6 +10,7 @@ import type { Device } from "./device/types.js";
 import { Orchestrator } from "./orchestrator.js";
 import { DeviceManager } from "./runtime/device-manager.js";
 import type { RegisterOptions } from "./runtime/device-registry.js";
+import type { ProviderManager } from "./providers/manager.js";
 import type { AgentAssignment } from "./runtime/types.js";
 
 /** A bare Device, or a Device with registration details. */
@@ -25,6 +26,8 @@ export interface AgentLabOptions {
    * "none": no assignments. Record: explicit MAIN id -> device id.
    */
   assignments?: "auto" | "none" | Readonly<Record<string, string>>;
+  /** LLM providers (API keys etc.). Optional: the deterministic agents work without it. */
+  providers?: ProviderManager;
   /** Merged over DEFAULT_BEHAVIORS. */
   behaviors?: BehaviorTable;
   /** Custom organization. Skips the 12/24 check, which applies to the default configuration only. */
@@ -37,6 +40,7 @@ export interface AgentLabRuntime {
   factory: AgentFactory;
   orchestrator: Orchestrator;
   devices: DeviceManager;
+  providers?: ProviderManager;
   agents: ManagedAgent[];
   /** Assign a device to a MAIN agent (sub-agents inherit it). */
   assignDevice(mainId: string, deviceId: string): AgentAssignment;
@@ -70,7 +74,7 @@ export function initializeAgentLab(opts: AgentLabOptions): AgentLabRuntime {
   const bus = new MessageBus();
   const ids = new Set(defs.map((d) => d.id));
   const defaults = Object.fromEntries(Object.entries(DEFAULT_BEHAVIORS).filter(([id]) => ids.has(id)));
-  const factory = new AgentFactory({ devices, registry, bus, behaviors: { ...defaults, ...opts.behaviors } });
+  const factory = new AgentFactory({ devices, ...(opts.providers ? { providers: opts.providers } : {}), registry, bus, behaviors: { ...defaults, ...opts.behaviors } });
   const agents = factory.createOrganization(defs);
 
   const problems = registry.validateRelationships();
@@ -87,6 +91,7 @@ export function initializeAgentLab(opts: AgentLabOptions): AgentLabRuntime {
     factory,
     orchestrator: new Orchestrator(registry, bus),
     devices,
+    ...(opts.providers ? { providers: opts.providers } : {}),
     agents,
     assignDevice(mainId, deviceId) {
       requireMain(mainId);

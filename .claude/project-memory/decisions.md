@@ -25,3 +25,7 @@ Format: date — decision — reason
 - MAIN agent flow: PLANNING -> device assigned? -> checkHealth -> withLease (BUSY) -> delegate -> release. Failures at any step are BLOCKED, not ERROR.
 - Sub-agent handlers are BLOCKED if no active parent lease exists or the device lacks a required device capability.
 - initializeAgentLab requires devices or a DeviceManager: there is deliberately no implicit mock fleet, so a misconfigured production run cannot silently pass on mocks.
+- Phase 3.5: LLM providers in src/providers/. Anthropic via the official SDK (first runtime dependency: @anthropic-ai/sdk, the earlier "no runtime deps" rule is relaxed for it); OpenAI-compatible via fetch (no dependency). Config stores env var NAMES only.
+- Provider routing: agent override, then MAIN parent override, then default. Handlers get optional ctx.llm; deterministic agents work without providers.
+- Consumer subscriptions are NOT supported as a provider: no API access, and using subscription tokens in third-party software is not something to build on (verify current terms before reconsidering).
+- Anthropic server-side refusal fallback is opt-in (serverSideFallback) because it is a beta parameter not yet verified against the live API from this repo.

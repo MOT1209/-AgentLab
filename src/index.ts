@@ -1,5 +1,6 @@
 export * from "./agents/index.js";
 export * from "./runtime/index.js";
+export * from "./providers/index.js";
 export * from "./bootstrap.js";
 export * from "./orchestrator.js";
 export * from "./device/types.js";

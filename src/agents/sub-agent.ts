@@ -38,7 +38,8 @@ export class SubAgent extends ManagedAgent {
     const device = this.deps.devices.getDevice(runtime.deviceId);
     if (!device) return { status: "BLOCKED", summary: `device ${runtime.deviceId} is no longer registered`, evidence: [] };
     try {
-      return await handler.handle({ task, device, runtime, definition: this.definition });
+      const llm = this.deps.providers?.forAgent(this.id, this.rootMainId);
+      return await handler.handle({ task, device, runtime, definition: this.definition, ...(llm ? { llm } : {}) });
     } catch (e) {
       // An unavailable device is an environment problem, not an agent fault.
       if (e instanceof DeviceError) return { status: "BLOCKED", summary: e.message, evidence: [] };
