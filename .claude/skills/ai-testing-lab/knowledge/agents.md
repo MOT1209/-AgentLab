@@ -1,61 +1,63 @@
 # AGENT KNOWLEDGE
 
-## 01 Functional Tester
+Source of truth in code: `src/agents/organization.ts`. A test keeps this file in sync.
 
-A: Authentication Tester
-B: Core Feature Tester
+## MAIN-01 Functional Tester
 
-## 02 Game Tester
+- MAIN-01-A Authentication Tester
+- MAIN-01-B Core Feature Tester
 
-A: Gameplay Tester
-B: Controls Tester
+## MAIN-02 Game Tester
 
-## 03 UI Tester
+- MAIN-02-A Gameplay Tester
+- MAIN-02-B Controls Tester
 
-A: Layout Tester
-B: Visual Regression Tester
+## MAIN-03 UI Tester
 
-## 04 Crash & Stability Tester
+- MAIN-03-A Layout Tester
+- MAIN-03-B Visual Regression Tester
 
-A: Crash Hunter
-B: Stability Tester
+## MAIN-04 Crash & Stability Tester
 
-## 05 Exploratory Tester
+- MAIN-04-A Crash Hunter
+- MAIN-04-B Stability Tester
 
-A: Exploration Agent
-B: Edge Case Agent
+## MAIN-05 Exploratory Tester
 
-## 06 Performance Tester
+- MAIN-05-A Exploration Agent
+- MAIN-05-B Edge Case Agent
 
-A: Runtime Performance Agent
-B: Startup/Loading Agent
+## MAIN-06 Performance Tester
 
-## 07 Accessibility Tester
+- MAIN-06-A Runtime Performance Agent
+- MAIN-06-B Startup & Loading Agent
 
-A: Accessibility UI Agent
-B: Interaction Accessibility Agent
+## MAIN-07 Accessibility Tester
 
-## 08 Network Tester
+- MAIN-07-A Accessibility UI Agent
+- MAIN-07-B Interaction Accessibility Agent
 
-A: Connectivity Agent
-B: API/Failure Agent
+## MAIN-08 Network Tester
 
-## 09 Security QA Tester
+- MAIN-08-A Connectivity Agent
+- MAIN-08-B API & Failure Agent
 
-A: Authentication/Data Agent
-B: Permissions/Configuration Agent
+## MAIN-09 Security QA Tester
 
-## 10 Regression Tester
+- MAIN-09-A Authentication & Data Agent
+- MAIN-09-B Permissions & Configuration Agent
 
-A: Previous Test Agent
-B: Version Comparison Agent
+## MAIN-10 Regression Tester
 
-## 11 Device Compatibility Tester
+- MAIN-10-A Previous Test Agent
+- MAIN-10-B Version Comparison Agent
 
-A: Android Version Agent
-B: Device Compatibility Agent
+## MAIN-11 Device Compatibility Tester
 
-## 12 QA Lead
+- MAIN-11-A Android Version Agent
+- MAIN-11-B Device Compatibility Agent
 
-A: Result Validation Agent
-B: Report Analysis Agent
+## MAIN-12 QA Lead / Review Agent
+
+- MAIN-12-A Result Validation Agent
+- MAIN-12-B Report Analysis Agent
