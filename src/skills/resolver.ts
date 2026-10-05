@@ -1,6 +1,7 @@
 import type { ActionName } from "../agents/exploration/actions.js";
 import { getMcpGroup } from "./mcp.js";
 import { actionAllowed, type Permission } from "./permissions.js";
+import { KNOWN_TOOLS } from "./tools.js";
 import type { SkillRegistry } from "./registry.js";
 import type { AgentLimits, AgentProfile, SkillDefinition, SkillEnvironment } from "./types.js";
 
@@ -23,6 +24,8 @@ export interface Resolution {
   readonly tools: readonly string[];
   readonly actions: readonly ActionName[];
   readonly limits?: AgentLimits;
+  /** Granted skills whose permissions the agent only partly holds; they run with the permitted subset. */
+  readonly restricted: readonly { skillId: string; missing: readonly Permission[] }[];
   /** Skills that matched but the agent may not use, with the reason. */
   readonly denied: readonly { skillId: string; reason: string }[];
   /** Things that matched but cannot run yet (planned skills, planned MCP groups). */
@@ -44,7 +47,7 @@ export class SkillResolver {
   resolve(req: ResolveRequest): Resolution {
     const profile = this.profiles.get(req.agentId);
     if (!profile) {
-      return { agentId: req.agentId, skills: [], permissions: [], tools: [], actions: [], denied: [{ skillId: "*", reason: `no profile for ${req.agentId}` }], unavailable: [] };
+      return { agentId: req.agentId, skills: [], permissions: [], tools: [], actions: [], restricted: [], denied: [{ skillId: "*", reason: `no profile for ${req.agentId}` }], unavailable: [] };
     }
     const text = [req.task?.type, req.task?.objective, req.goal].filter(Boolean).join(" ").toLowerCase();
     const matches = (s: SkillDefinition): boolean => s.alwaysOn === true || s.triggers.some((t) => text.includes(t));
@@ -52,6 +55,7 @@ export class SkillResolver {
     const grantedPerms = new Set(profile.permissions);
     const denied: { skillId: string; reason: string }[] = [];
     const unavailable: { kind: "skill" | "mcp"; id: string; reason: string }[] = [];
+    const restricted: { skillId: string; missing: Permission[] }[] = [];
     const accepted: SkillDefinition[] = [];
 
     for (const id of profile.skills) {
@@ -71,11 +75,8 @@ export class SkillResolver {
         denied.push({ skillId: id, reason: `dependency ${missingDep.id} is not granted to ${req.agentId}` });
         continue;
       }
-      const missingPerm = skill.permissions.find((p) => !grantedPerms.has(p));
-      if (missingPerm) {
-        denied.push({ skillId: id, reason: `permission ${missingPerm} is not granted to ${req.agentId}` });
-        continue;
-      }
+      const missing = skill.permissions.filter((p) => !grantedPerms.has(p));
+      if (missing.length > 0) restricted.push({ skillId: id, missing });
       accepted.push(skill);
     }
 
@@ -88,15 +89,16 @@ export class SkillResolver {
       if (getMcpGroup(g)?.status !== "available") unavailable.push({ kind: "mcp", id: g, reason: "planned: no MCP server exists yet" });
     }
 
-    const permissions = uniq(accepted.flatMap((s) => s.permissions));
-    const granted2 = new Set(permissions);
+    const permissions = uniq(accepted.flatMap((s) => s.permissions)).filter((p) => grantedPerms.has(p));
+    const effective = new Set(permissions);
     return {
       agentId: req.agentId,
       skills: accepted,
       permissions,
-      tools: uniq(accepted.flatMap((s) => s.tools)),
-      actions: uniq(accepted.flatMap((s) => s.actions)).filter((a) => actionAllowed(a, granted2)),
+      tools: uniq(accepted.flatMap((s) => s.tools)).filter((t) => effective.has(KNOWN_TOOLS[t]!)),
+      actions: uniq(accepted.flatMap((s) => s.actions)).filter((a) => actionAllowed(a, effective)),
       limits: profile.limits,
+      restricted,
       denied,
       unavailable,
     };

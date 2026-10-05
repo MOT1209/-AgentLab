@@ -5,6 +5,9 @@ import { SkillResolver } from "../src/skills/resolver.js";
 import { SkillError, agentMatches, type AgentLimits, type AgentProfile, type SkillDefinition } from "../src/skills/types.js";
 import { ACTION_PERMISSION, actionAllowed, type Permission } from "../src/skills/permissions.js";
 import { ACTION_NAMES } from "../src/agents/exploration/actions.js";
+import { CANONICAL_DEFINITIONS } from "../src/agents/organization.js";
+import { SKILL_CATALOG } from "../src/skills/catalog.js";
+import { ProfileSet, buildProfiles, createDefaultSkillSystem, validateProfiles } from "../src/skills/profiles.js";
 
 function skill(over: Partial<SkillDefinition> = {}): SkillDefinition {
   return {
@@ -183,6 +186,7 @@ test("resolver: task text selects skills, alwaysOn skills always apply, planned 
   assert.deepEqual(res.unavailable, [{ kind: "skill", id: "future-visual", reason: "planned: no runtime behavior exists yet" }]);
   assert.equal(res.limits, LIMITS);
   assert.deepEqual(res.denied, []);
+  assert.deepEqual(res.restricted, []);
 
   const none = resolverFixture().resolve({ agentId: "MAIN-01-B", task: { type: "unrelated" } });
   assert.deepEqual(none.skills.map((s) => s.id), ["core-rules"]);
@@ -204,4 +208,109 @@ test("resolver: environment compatibility and goal text are honoured", () => {
   assert.ok(agentEnv.denied.some((d) => d.skillId === "claude-doc" && /supports claude, not agent/.test(d.reason)));
   const claudeEnv = resolverFixture().resolve({ agentId: "MAIN-01-B", goal: "read the docs", environment: "claude" });
   assert.ok(claudeEnv.skills.some((s) => s.id === "claude-doc"));
+});
+
+// ---- default catalog and the 36 profiles ----------------------------------------------------------
+
+const system = createDefaultSkillSystem();
+
+test("catalog: valid, unique ids, only skills with behavior (or docs) are implemented", () => {
+  assert.deepEqual(system.registry.validate(), []);
+  assert.equal(new Set(SKILL_CATALOG.map((c) => c.id)).size, SKILL_CATALOG.length);
+  const implemented = system.registry.list({ status: "implemented" }).map((x) => x.id).sort();
+  assert.deepEqual(implemented, ["agentlab-android-qa", "agentlab-core", "agentlab-crash-analysis", "agentlab-exploration", "agentlab-security", "agentlab-smoke-testing", "ai-testing-lab"]);
+  const mcp = system.registry.get("agentlab-mcp")!;
+  assert.equal(mcp.status, "planned");
+  assert.equal(mcp.documented, true);
+  assert.equal(system.registry.get("ai-testing-lab")!.manual, true);
+});
+
+test("profiles: all 12 MAIN and 24 SUB agents have a valid profile", () => {
+  const defs = CANONICAL_DEFINITIONS;
+  assert.equal(defs.filter((d) => d.kind === "MAIN").length, 12);
+  assert.equal(defs.filter((d) => d.kind === "SUB").length, 24);
+  assert.equal(system.profiles.list().length, 36);
+  for (const d of defs) assert.ok(system.profiles.get(d.id), `${d.id} has no profile`);
+  assert.deepEqual(validateProfiles(system.profiles, system.registry), []);
+});
+
+test("profiles: a MAIN profile is exactly the union of its subs, and a sub never exceeds its parent", () => {
+  for (const main of CANONICAL_DEFINITIONS.filter((d) => d.kind === "MAIN")) {
+    const m = system.profiles.get(main.id)!;
+    const subs = CANONICAL_DEFINITIONS.filter((d) => d.parentId === main.id).map((d) => system.profiles.get(d.id)!);
+    assert.deepEqual([...m.skills].sort(), [...new Set(subs.flatMap((x) => x.skills))].sort(), main.id);
+    assert.deepEqual([...m.permissions].sort(), [...new Set(subs.flatMap((x) => x.permissions))].sort(), main.id);
+    for (const s of subs) for (const perm of s.permissions) assert.ok(m.permissions.includes(perm));
+  }
+});
+
+test("least privilege: effective permissions follow each agent's declared capabilities", () => {
+  const perms = (id: string) => system.profiles.get(id)!.permissions;
+  assert.deepEqual([...perms("MAIN-03-A")].sort(), ["SCREENSHOT", "UI_READ"]);
+  assert.deepEqual(perms("MAIN-12-A"), []);
+  assert.deepEqual(system.profiles.get("MAIN-12-A")!.deviceSources, []);
+  const holders = (perm: Permission) => system.profiles.list().filter((p) => p.permissions.includes(perm)).map((p) => p.agentId).sort();
+  assert.deepEqual(holders("APP_INSTALL"), ["MAIN-01", "MAIN-01-B", "MAIN-11", "MAIN-11-A", "MAIN-11-B"]);
+  for (const never of ["CODE_WRITE", "ADMIN", "MCP_EXECUTE", "MCP_READ", "BROWSER_ACCESS", "CODE_READ", "NETWORK_TEST"] as Permission[]) assert.deepEqual(holders(never), [], never);
+  assert.deepEqual(holders("DEVICE_INTERACT").filter((a) => a.startsWith("MAIN-05")), ["MAIN-05", "MAIN-05-A", "MAIN-05-B"]);
+  assert.ok(!perms("MAIN-01-B").includes("DEVICE_INTERACT"));
+});
+
+test("profile validation catches unauthorised grants", () => {
+  const base = new Map(system.profiles.list().map((p) => [p.agentId, p]));
+  const check = (id: string, over: Partial<AgentProfile>) => {
+    const m = new Map(base);
+    m.set(id, { ...base.get(id)!, ...over });
+    return validateProfiles(new ProfileSet(m), system.registry);
+  };
+  assert.ok(check("MAIN-03-A", { permissions: ["SCREENSHOT", "UI_READ", "LOG_READ"] }).some((p) => /MAIN-03-A: permission LOG_READ exceeds the agent's declared capabilities/.test(p)));
+  assert.ok(check("MAIN-03-A", { permissions: ["SCREENSHOT", "UI_READ", "APP_INSTALL"] }).some((p) => /APP_INSTALL/.test(p)));
+  assert.ok(check("MAIN-05-A", { skills: ["agentlab-core", "agentlab-exploration"] }).some((p) => /needs agentlab-android-qa, which is not granted/.test(p)));
+  assert.ok(check("MAIN-05-A", { skills: ["agentlab-core", "agentlab-android-qa", "agentlab-crash-analysis", "agentlab-exploration", "agentlab-mcp"] }).some((p) => /agentlab-mcp is not implemented/.test(p)));
+  assert.ok(check("MAIN-05-A", { skills: ["agentlab-core", "ghost"] }).some((p) => /unknown skill ghost/.test(p)));
+  assert.ok(check("MAIN-03-A", { skills: ["agentlab-core", "agentlab-android-qa", "agentlab-exploration"] }).some((p) => /agentlab-exploration is not in parent|not compatible with MAIN-03-A/.test(p)));
+  assert.ok(check("MAIN-03-A", { plannedSkills: ["agentlab-core"] }).some((p) => /agentlab-core is implemented; grant it under skills/.test(p)));
+  assert.ok(check("MAIN-03-A", { limits: { ...LIMITS, maxCost: 5 } }).some((p) => /maxCost requires provider pricing/.test(p)));
+  assert.ok(check("MAIN-03-A", { limits: { ...LIMITS, maxTokens: 0 } }).some((p) => /maxTokens must be a positive integer/.test(p)));
+  assert.ok(check("MAIN-03-A", { deviceSources: [] }).some((p) => /device permissions granted but no deviceSources/.test(p)));
+  const without = new Map(base);
+  without.delete("MAIN-09-B");
+  assert.ok(validateProfiles(new ProfileSet(without), system.registry).some((p) => /MAIN-09-B: no profile/.test(p)));
+  const sub = check("MAIN-04-B", { limits: { ...LIMITS, maxSteps: 9999 } });
+  assert.ok(sub.some((p) => /limits.maxSteps exceeds parent MAIN-04/.test(p)));
+});
+
+test("resolver (real catalog): exploration is selected for the explorer, not for a layout tester", () => {
+  const explore = system.resolver.resolve({ agentId: "MAIN-05-A", task: { type: "explore", objective: "find crashes in the app" } });
+  assert.deepEqual(explore.skills.map((x) => x.id).sort(), ["agentlab-android-qa", "agentlab-core", "agentlab-crash-analysis", "agentlab-exploration"]);
+  assert.deepEqual([...explore.actions].sort(), [...ACTION_NAMES].sort());
+  assert.equal(explore.limits!.maxSteps, 200);
+
+  const layout = system.resolver.resolve({ agentId: "MAIN-03-A", task: { type: "explore", objective: "find visual bugs" } });
+  assert.ok(!layout.skills.some((x) => x.id === "agentlab-exploration"));
+  assert.ok(layout.unavailable.some((u) => u.id === "agentlab-visual-testing"));
+  assert.ok(!layout.actions.includes("TAP"));
+});
+
+test("resolver (real catalog): a partly-permitted skill is restricted to the permitted subset", () => {
+  const res = system.resolver.resolve({ agentId: "MAIN-01-B", task: { type: "smoke", objective: "check the app on the device" } });
+  assert.ok(res.skills.some((x) => x.id === "agentlab-smoke-testing"));
+  const qa = res.restricted.find((r) => r.skillId === "agentlab-android-qa")!;
+  assert.deepEqual([...qa.missing].sort(), ["DEVICE_READ", "UI_READ"]);
+  assert.ok(!res.actions.includes("GET_UI"));
+  assert.ok(res.actions.includes("GET_LOGS"));
+  assert.ok(!res.tools.includes("device.ui"));
+  assert.ok(res.tools.includes("device.install"));
+});
+
+test("resolver (real catalog): MCP and planned skills are reported unavailable, never granted", () => {
+  const res = system.resolver.resolve({ agentId: "MAIN-12-A", task: { objective: "evaluate results and use mcp" } });
+  assert.deepEqual(res.skills.map((x) => x.id), ["agentlab-core"]);
+  assert.ok(res.unavailable.some((u) => u.kind === "skill" && u.id === "agentlab-evaluation"));
+  assert.deepEqual(res.permissions, []);
+  assert.deepEqual(res.actions, []);
+});
+
+test("buildProfiles on a custom organization yields no profiles (grants are for the canonical ids only)", () => {
+  assert.equal(buildProfiles(system.registry, []).list().length, 0);
 });

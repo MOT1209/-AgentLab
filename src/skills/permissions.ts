@@ -1,3 +1,4 @@
+import type { Capability } from "../agents/capabilities.js";
 import type { ActionName } from "../agents/exploration/actions.js";
 
 /** What a skill/agent may do. Distinct from device `Capability` (what hardware can do). */
@@ -53,4 +54,38 @@ export function permissionForAction(action: ActionName): Permission | null {
 export function actionAllowed(action: ActionName, granted: ReadonlySet<Permission>): boolean {
   const needed = ACTION_PERMISSION[action];
   return needed === null || granted.has(needed);
+}
+
+/** Permissions that mean "touches a device"; an agent holding any of them needs a device source. */
+export const DEVICE_PERMISSIONS: readonly Permission[] = ["DEVICE_READ", "DEVICE_INTERACT", "SCREENSHOT", "UI_READ", "LOG_READ", "APP_LAUNCH", "APP_INSTALL"];
+
+/**
+ * What each existing agent `Capability` implies. An agent's effective permissions are the granted
+ * skills' permissions intersected with this, so AgentDefinition.capabilities stays the source of truth.
+ */
+export const CAPABILITY_PERMISSION: Readonly<Partial<Record<Capability, Permission>>> = {
+  install_app: "APP_INSTALL",
+  launch_app: "APP_LAUNCH",
+  stop_app: "APP_LAUNCH",
+  tap: "DEVICE_INTERACT",
+  type: "DEVICE_INTERACT",
+  swipe: "DEVICE_INTERACT",
+  press_key: "DEVICE_INTERACT",
+  screenshot: "SCREENSHOT",
+  logs: "LOG_READ",
+  device_info: "DEVICE_READ",
+  inspect_ui: "UI_READ",
+  network_control: "NETWORK_TEST",
+};
+
+/** Permissions an agent capability can imply; only these are narrowed by AgentDefinition.capabilities. */
+export const CAPABILITY_GATED: ReadonlySet<Permission> = new Set(Object.values(CAPABILITY_PERMISSION) as Permission[]);
+
+export function permissionsForCapabilities(caps: readonly Capability[]): Set<Permission> {
+  const out = new Set<Permission>();
+  for (const c of caps) {
+    const perm = CAPABILITY_PERMISSION[c];
+    if (perm) out.add(perm);
+  }
+  return out;
 }

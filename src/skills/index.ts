@@ -4,3 +4,5 @@ export * from "./registry.js";
 export * from "./resolver.js";
 export * from "./tools.js";
 export * from "./types.js";
+export * from "./catalog.js";
+export * from "./profiles.js";

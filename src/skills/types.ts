@@ -60,6 +60,8 @@ export interface SkillDefinition {
   readonly alwaysOn?: boolean;
   /** Hand-written elsewhere (e.g. ai-testing-lab). Validated, never generated or overwritten. */
   readonly manual?: boolean;
+  /** A planned skill that still gets a generated SKILL.md (architecture guidance for developers). */
+  readonly documented?: boolean;
   /** Shared body written into every generated SKILL.md. */
   readonly instructions: string;
   /** Optional extra text per developer environment. */
