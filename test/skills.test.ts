@@ -262,6 +262,7 @@ test("least privilege: effective permissions follow each agent's declared capabi
   const perms = (id: string) => system.profiles.get(id)!.permissions;
   assert.deepEqual([...perms("MAIN-03-A")].sort(), ["SCREENSHOT", "UI_READ"]);
   assert.deepEqual(perms("MAIN-12-A"), []);
+  assert.deepEqual([...system.profiles.get("MAIN-05-A")!.deviceSources].sort(), ["EMULATOR", "MOCK", "PHYSICAL", "REMOTE"], "wireless-adb phones count as REMOTE and must stay usable");
   assert.deepEqual(system.profiles.get("MAIN-12-A")!.deviceSources, []);
   const holders = (perm: Permission) => system.profiles.list().filter((p) => p.permissions.includes(perm)).map((p) => p.agentId).sort();
   assert.deepEqual(holders("APP_INSTALL"), ["MAIN-01", "MAIN-01-B", "MAIN-11", "MAIN-11-A", "MAIN-11-B"]);
@@ -290,6 +291,7 @@ test("profile validation catches unauthorised grants", () => {
   const without = new Map(base);
   without.delete("MAIN-09-B");
   assert.ok(validateProfiles(new ProfileSet(without), system.registry).some((p) => /MAIN-09-B: no profile/.test(p)));
+  assert.ok(check("MAIN-10-A", { skills: ["agentlab-core", "agentlab-android-qa"] }).some((p) => /agentlab-android-qa contributes no permission for this agent/.test(p)));
   const sub = check("MAIN-04-B", { limits: { ...LIMITS, maxSteps: 9999 } });
   assert.ok(sub.some((p) => /limits.maxSteps exceeds parent MAIN-04/.test(p)));
 });

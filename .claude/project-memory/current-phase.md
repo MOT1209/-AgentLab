@@ -1,5 +1,14 @@
 # CURRENT PHASE
 
+Phase 6 - skill architecture done (src/skills/, see skills-architecture.md and knowledge/skills.md). One canonical SkillDefinition catalog
+(6 implemented skills + ai-testing-lab manual + MCP guide planned/documented + 12 planned entries), SkillRegistry, SkillResolver, permission model,
+least-privilege profiles for all 36 agents (effective permissions = granted skills limited by each agent's declared capabilities), generated
+.claude/skills and .agent/skills with drift/hash/safety validation (`npm run skills:list|validate|sync`), and runtime enforcement: handler
+permissions gate SubAgent (BLOCKED), exploration actions are narrowed to the profile, profile limits are ceilings (maxSteps, time, maxLLMCalls,
+maxTokens; BUDGET_EXHAUSTED -> BLOCKED). On by default for the canonical organization (skills:false opts out). 154 tests pass.
+Nothing external installed (skills.sh was unreachable). Still never run against a real device, real adb, or a live LLM.
+Next: close the HIGH known issues; see Roadmap in skills-architecture.md.
+
 Phase 5, Step 3.1 — adb hotfix after the user's Windows report ("adb not found" with a phone on USB):
 ADB_PATH env var (and createApiServer { adbPath, discovery } options) now reach AdbDiscovery and the
 AdbDevice instances it creates; the UI shows the raw error and lists skipped devices with their adb state

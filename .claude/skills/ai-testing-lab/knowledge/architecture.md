@@ -33,6 +33,12 @@ Supporting systems:
 - Security
 - Monitoring
 
+## Skill layer (Phase 6)
+
+SkillDefinition catalog -> SkillRegistry -> AgentProfile (per agent) -> SkillResolver; enforced in SubAgent and the exploration loop.
+Generated adapters: .claude/skills and .agent/skills. Details: knowledge/skills.md. It extends the agent organization and does not change it
+(still exactly 12 MAIN + 24 SUB).
+
 ## Device runtime (Phase 3)
 
 DeviceManager (src/runtime/)

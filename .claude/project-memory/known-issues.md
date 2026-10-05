@@ -11,15 +11,24 @@
 - Leases and assignments are in memory only; a process crash loses them (a restarted run starts clean, which is safe, but history is lost) — LOW — open
 - Device capability list is declared per device (defaults to the 8 implemented); AdbDevice does not verify it — LOW — open
 - Providers are only tested with fakes; no live call to Anthropic/OpenAI-compatible endpoints has been made — MEDIUM — open
-- No usage/cost accounting or budget cap per provider; a looping agent could spend without limit — MEDIUM — open
+- No cost accounting per provider or across runs; each exploration run is now bounded by its profile's maxLLMCalls/maxTokens, but there is no total budget over many runs and no money-denominated cap — MEDIUM — open
 - serverSideFallback request shape follows the SDK skill docs but is unverified live — LOW — open
 - Provider API keys are read from process env; no vault/secret-manager integration — LOW — open
 - Exploration agent has never run against a real device or a live LLM; AdbDevice swipe/pressKey/ui/clearLogs only tested via a fake adb script (argument construction) — HIGH — open
 - The model is blind to pixels: it only sees the UI hierarchy text. Games, WebViews and canvases expose little or no hierarchy, so exploration there will be weak — HIGH — open
 - UI text/log lines are sent to the LLM provider; apps showing personal data would leak it to that provider — MEDIUM — open
-- No cost cap: maxSteps/timeout bound a run, but tokens/cost are only reported in telemetry — MEDIUM — open
+- No cost cap in money terms (see maxCost above); steps, time, LLM calls and tokens are capped per run by the agent profile — MEDIUM — open
 - No back-off between LLM calls and no concurrency limit across the 12 MAIN agents (rate limits untested) — LOW — open
 - uiautomator dump can fail while an animation runs or on secure screens (FLAG_SECURE); the agent then sees "ui: unavailable" — LOW — open
+- Skill enforcement covers only AgentLab's own handlers/actions; generated .claude/.agent SKILL.md files are advisory and cannot be enforced — MEDIUM — by design
+- .agent/skills convention unverified (Antigravity docs and skills.sh were blocked); may need `.agents/` — LOW — open
+- No maxCost: provider pricing does not exist, so cost cannot be enforced (only tokens/LLM calls/steps/time) — MEDIUM — open
+- Token ceiling can be overshot by one model call (usage is known after the call) — LOW — open
+- MAIN-05-B (Edge Case Agent) declares only tap/type/screenshot/logs, so it cannot run the exploration handler; it holds the exploration skill but only SCREENSHOT/LOG_READ/DEVICE_INTERACT effectively. MAIN-10-A declares no device capability. Their definitions need extending before real behavior is added — LOW — open
+- Skill selection is keyword (substring) matching, no semantics; wrong or missed skills are possible — LOW — open
+- Goal loop has no independent verification or replanning; the exploration loop only maps onto it — MEDIUM — open
+- No Agent Run record (skills, tools, LLM calls, tokens, cost, evidence in one place); only ExplorationTelemetry and the message bus — LOW — open
+- Profile limits (steps, LLM calls, tokens, time) are enforced only inside the exploration loop; the smoke handler is a fixed sequence and Agent.run still has no per-task timeout — LOW — open
 - src/api/ has no auth/authz: any caller that can reach the port can dispatch tests, read provider status, and stream the full message bus. Fine for local dev only — MEDIUM — open
 - Control Center UI has only been exercised in headless Chromium against mocks; no real device/adb/LLM, no mobile-browser pass, and POST /providers lets any caller who can reach the port register a provider that reads any env var NAME present on the server (including unrelated secrets) — MEDIUM — open (needs auth or an allowlist before any non-local use)
 - No request body size limit on POST routes (readJsonBody buffers the whole body) — LOW — open

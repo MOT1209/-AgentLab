@@ -44,7 +44,7 @@ const SUB_GRANTS: Readonly<Record<string, Grant>> = {
   "MAIN-08-B": g([CORE, QA], ["agentlab-network-testing"]),
   "MAIN-09-A": g([CORE, SECURITY]),
   "MAIN-09-B": g([CORE, QA, SECURITY]),
-  "MAIN-10-A": g([CORE, QA], ["agentlab-regression"]),
+  "MAIN-10-A": g([CORE], ["agentlab-regression"]),
   "MAIN-10-B": g([CORE], ["agentlab-regression", "agentlab-visual-testing"]),
   "MAIN-11-A": g([CORE, QA, SMOKE], ["agentlab-compatibility"]),
   "MAIN-11-B": g([CORE, QA, SMOKE], ["agentlab-compatibility"]),
@@ -55,7 +55,8 @@ const SUB_GRANTS: Readonly<Record<string, Grant>> = {
 /** Ceilings. Explorers may run to the existing hard caps (200 steps, 30 min); everyone else gets less. */
 const EXPLORER_LIMITS: AgentLimits = { maxSteps: 200, maxLLMCalls: 400, maxTokens: 2_000_000, maxExecutionTimeMs: 1_800_000 };
 const DEFAULT_LIMITS: AgentLimits = { maxSteps: 50, maxLLMCalls: 100, maxTokens: 500_000, maxExecutionTimeMs: 600_000 };
-const DEVICE_SOURCES: readonly DeviceSource[] = ["MOCK", "EMULATOR", "PHYSICAL"];
+/** REMOTE included: the existing heuristic labels wireless-adb phones (host:port serials) REMOTE, and blocking them would only break real use. */
+const DEVICE_SOURCES: readonly DeviceSource[] = ["MOCK", "EMULATOR", "PHYSICAL", "REMOTE"];
 
 const uniq = <T,>(xs: Iterable<T>): T[] => [...new Set(xs)];
 const LIMIT_KEYS = ["maxSteps", "maxLLMCalls", "maxTokens", "maxExecutionTimeMs"] as const;
@@ -135,6 +136,7 @@ export function validateProfiles(profiles: ProfileSet, registry: SkillRegistry, 
       const compat = registry.compatibility(id, { agentId: def.id });
       if (!compat.ok && skill.status === "implemented") bad(compat.reasons.join("; "));
       for (const dep of registry.dependencies(id)) if (!granted.has(dep.id)) bad(`${id} needs ${dep.id}, which is not granted`);
+      if (skill.permissions.length > 0 && !skill.permissions.some((perm) => prof.permissions.includes(perm))) bad(`${id} contributes no permission for this agent; remove the grant`);
     }
     for (const id of prof.plannedSkills) {
       const skill = registry.get(id);

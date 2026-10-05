@@ -6,7 +6,7 @@ An AI-driven Android application and game testing platform, built around a fixed
 
 - TypeScript on Node 22, strict mode, tests with `node:test`
 - One runtime dependency: `@anthropic-ai/sdk`
-- 98 tests, all offline (mock devices, mock LLM, no API keys)
+- Offline test suite (mock devices, mock LLM, no API keys); `npm test` runs it
 
 ---
 
@@ -35,6 +35,7 @@ Key ideas:
 | **Device runtime** | `src/runtime/` | `DeviceRegistry`, `DevicePool` (exclusive leases), `DeviceManager` (assignments, health checks, discovery). A device is a resource; an agent is a worker; the only link is `AgentAssignment`. |
 | **Providers** | `src/providers/` | API keys by **environment variable name** only. Per-agent routing: agent → its MAIN parent → default. |
 | **Messages** | `src/agents/messages.ts` | In-memory bus: task assigned/result, status changes, errors. |
+| **Skills** | `src/skills/` | One canonical skill catalog, a permission model, and a least-privilege profile for each of the 36 agents. Enforced on AgentLab's own agents; `.claude/skills` and `.agent/skills` are generated from the same catalog. See [Skills](#skills). |
 
 Full 36-agent list: [`.claude/skills/ai-testing-lab/knowledge/agents.md`](.claude/skills/ai-testing-lab/knowledge/agents.md).
 
@@ -72,7 +73,7 @@ Requirements: Node 22+, npm. For real runs also `adb` (Android SDK platform-tool
 git clone https://github.com/MOT1209/-AgentLab.git
 cd -AgentLab
 npm install
-npm test          # typecheck + build + 98 tests, fully offline
+npm test          # typecheck + build + all tests, fully offline
 ```
 
 Other scripts: `npm run typecheck`, `npm run build`.
@@ -192,6 +193,24 @@ More: [`.claude/skills/ai-testing-lab/knowledge/exploration.md`](.claude/skills/
 
 ---
 
+## Skills
+
+A skill is a typed definition in `src/skills/catalog.ts`: id, permissions, the LLM actions and tools it enables, dependencies, and which agents may use it. From it AgentLab derives:
+
+- **Profiles** (`src/skills/profiles.ts`): what each of the 36 agents may use. A SUB profile is granted skills, and its effective permissions are those skills' permissions limited to what the agent's declared `capabilities` imply. A MAIN profile is the union of its subs.
+- **Enforcement** (on by default for the canonical organization; `initializeAgentLab({ skills: false })` turns it off): a handler that declares `permissions` is `BLOCKED` unless the agent's profile holds them; the exploration agent's action set is narrowed to the profile; the profile's `maxSteps`, `maxExecutionTimeMs`, `maxLLMCalls` and `maxTokens` are ceilings over the task's.
+- **Developer-assistant skills**: `.claude/skills/agentlab-*/SKILL.md` and `.agent/skills/agentlab-*/SKILL.md` are generated, never edited by hand.
+
+```
+npm run skills:list                 # skills; add `-- --agents` for every agent's profile
+npm run skills:validate             # catalog, profiles, generated files, safety scan (CI)
+npm run skills:sync                 # regenerate the SKILL.md files; `-- --check` to only report
+```
+
+The generated SKILL.md files are advisory for Claude Code and similar tools; only AgentLab's own runtime actions are enforced. Skills with no behavior behind them (performance, visual, MCP, ...) are catalogued as `planned` and are never granted. Details: [`knowledge/skills.md`](.claude/skills/ai-testing-lab/knowledge/skills.md).
+
+---
+
 ## Providers
 
 | Kind | Use for | Notes |
@@ -226,12 +245,16 @@ src/
   runtime/           device registry, pool/leases, manager, discovery
   device/            Device interface, MockDevice, AdbDevice, UI parser
   providers/         Anthropic, OpenAI-compatible, Mock, manager, config
+  skills/            skill catalog, permissions, registry, resolver, profiles, sync/validate CLI
   bootstrap.ts       initializeAgentLab()
   orchestrator.ts    dispatch (with cancellation)
-test/                98 offline tests
+test/                offline tests
 .claude/
-  skills/ai-testing-lab/   project skill: architecture, agents, android, providers, exploration notes
+  skills/ai-testing-lab/   project skill: architecture, agents, android, providers, exploration, skills notes
+  skills/agentlab-*/       generated from src/skills/catalog.ts (do not edit)
   project-memory/          current phase, decisions, known issues, completed work
+.agent/
+  skills/agentlab-*/       generated from src/skills/catalog.ts (do not edit)
 providers.example.json
 ```
 
