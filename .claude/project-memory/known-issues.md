@@ -19,6 +19,8 @@
 - No cost cap in money terms (see maxCost above); steps, time, LLM calls and tokens are capped per run by the agent profile — MEDIUM — open
 - No back-off between LLM calls and no concurrency limit across the 12 MAIN agents (rate limits untested) — LOW — open
 - uiautomator dump can fail while an animation runs or on secure screens (FLAG_SECURE); the agent then sees "ui: unavailable" — LOW — open
+- Two overlapping web UIs (src/ui on its own port and src/api + web/); different APIs and state models. Pick one or share a backend — MEDIUM — open
+- Phase 4.5 real-device proof is still NOT done (no device/emulator here); the opt-in test (REAL_DEVICE_TEST=1) and the real-adb test (needs an adb binary) are skipped in CI-like runs — HIGH — open
 - Skill enforcement covers only AgentLab's own handlers/actions; generated .claude/.agent SKILL.md files are advisory and cannot be enforced — MEDIUM — by design
 - .agent/skills convention unverified (Antigravity docs and skills.sh were blocked); may need `.agents/` — LOW — open
 - No maxCost: provider pricing does not exist, so cost cannot be enforced (only tokens/LLM calls/steps/time) — MEDIUM — open

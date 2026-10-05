@@ -4,7 +4,8 @@ import { extname, resolve, sep } from "node:path";
 import type { AgentLabRuntime } from "../bootstrap.js";
 import type { AgentResult, Task } from "../agents/types.js";
 import { AdbDevice } from "../device/adb-device.js";
-import { AdbDiscovery, type DeviceDiscovery } from "../runtime/discovery.js";
+import type { Device } from "../device/types.js";
+import { AdbDiscovery, type DeviceDiscovery, type DiscoveredDevice } from "../runtime/discovery.js";
 import { PROVIDER_PRESETS } from "../providers/presets.js";
 import { ProviderError } from "../providers/types.js";
 import { TaskStore } from "./task-store.js";
@@ -43,6 +44,8 @@ export interface ApiOptions {
   adbPath?: string;
   /** Replaces adb discovery entirely (tests, other device sources). */
   discovery?: DeviceDiscovery;
+  /** Builds the Device for a discovered entry. Default: AdbDevice using `adbPath`. */
+  createDevice?: (d: DiscoveredDevice) => Device;
 }
 
 export function createApiServer(runtime: AgentLabRuntime, opts: ApiOptions = {}): Server {
@@ -155,7 +158,7 @@ export function createApiServer(runtime: AgentLabRuntime, opts: ApiOptions = {})
 
   async function handleDeviceDiscover(): Promise<JsonResponse> {
     try {
-      const result = await runtime.devices.discover(opts.discovery ?? new AdbDiscovery(adbPath), (d) => new AdbDevice(d.serial, adbPath));
+      const result = await runtime.devices.discover(opts.discovery ?? new AdbDiscovery(adbPath), opts.createDevice ?? ((d) => new AdbDevice(d.serial, adbPath)));
       return json(200, result);
     } catch (e) {
       return json(502, { error: e instanceof Error ? e.message : String(e) });

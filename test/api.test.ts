@@ -7,7 +7,7 @@ import { ProviderManager } from "../src/providers/manager.js";
 import { MockProvider } from "../src/providers/mock-provider.js";
 import { initializeAgentLab } from "../src/bootstrap.js";
 import { DeviceManager } from "../src/runtime/device-manager.js";
-import { createMockFleet } from "../src/device/mock-device.js";
+import { MockDevice, createMockFleet } from "../src/device/mock-device.js";
 import { lab, smokePayload } from "./helpers.js";
 
 async function withServer<T>(server: Server, run: (base: string) => Promise<T>): Promise<T> {
@@ -176,20 +176,27 @@ test("api: discover surfaces the raw adb error and honours adbPath", async () =>
   });
 });
 
-test("api: discover returns skipped devices with their adb state", async () => {
+test("api: discover registers healthy devices and reports unauthorized ones as rejected with their state", async () => {
   const discovery = {
     discover: async () => [
-      { serial: "ABC123", state: "device", model: "Pixel_7" },
+      { serial: "DEVICE-OK", state: "device", model: "Pixel_7" },
       { serial: "XYZ789", state: "unauthorized" },
     ],
   };
   const rt = initializeAgentLab({ deviceManager: new DeviceManager(), assignments: "none" });
-  await withServer(createApiServer(rt, { discovery }), async (base) => {
+  const createDevice = (d: { serial: string }) => new MockDevice(d.serial);
+  await withServer(createApiServer(rt, { discovery, createDevice }), async (base) => {
     const r = await postJson(`${base}/devices/discover`, {});
     assert.equal(r.status, 200);
-    const body = r.body as { added: unknown[]; skipped: Array<{ serial: string; state: string }> };
+    const body = r.body as { added: unknown[]; skipped: unknown[]; rejected: Array<{ serial: string; state: string; reason: string }> };
     assert.equal(body.added.length, 1);
-    assert.deepEqual(body.skipped.map((d) => [d.serial, d.state]), [["XYZ789", "unauthorized"]]);
+    assert.deepEqual(body.skipped, []);
+    assert.deepEqual(body.rejected.map((d) => [d.serial, d.state]), [["XYZ789", "unauthorized"]]);
+    assert.ok(body.rejected[0]!.reason.length > 0);
+
+    const again = (await postJson(`${base}/devices/discover`, {})).body as { added: unknown[]; skipped: unknown[] };
+    assert.equal(again.added.length, 0);
+    assert.equal(again.skipped.length, 1, "an already registered device is skipped");
   });
 });
 

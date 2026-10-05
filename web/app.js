@@ -62,11 +62,12 @@ async function renderDevices(root) {
       const raw = String(r.data.error ?? r.status);
       out.append(msg("err", /ENOENT/.test(raw) ? t().adbMissing : `${t().error}`), el("div", { class: "help", dir: "ltr" }, `${t().rawError}: ${raw}`));
     } else {
-      out.append(msg("ok", t().discovered(r.data.added.length, r.data.skipped.length)));
-      if (r.data.skipped.length > 0) {
-        const hint = (d) => (d.state === "unauthorized" ? t().hintUnauthorized : d.state === "offline" ? t().hintOffline : d.state === "device" ? t().hintKnown : t().hintOther);
+      const rejected = r.data.rejected ?? [];
+      out.append(msg("ok", t().discovered(r.data.added.length, r.data.skipped.length, rejected.length)));
+      if (rejected.length > 0) {
+        const hint = (d) => (d.state === "unauthorized" ? t().hintUnauthorized : d.state === "offline" ? t().hintOffline : t().hintOther);
         out.append(
-          el("div", { class: "msg warn" }, el("strong", {}, t().skippedTitle), el("ul", {}, r.data.skipped.map((d) => el("li", {}, el("bdi", {}, `${d.serial}${d.model ? ` (${d.model})` : ""}`), ` — ${d.state}: ${hint(d)}`)))),
+          el("div", { class: "msg warn" }, el("strong", {}, t().skippedTitle), el("ul", {}, rejected.map((d) => el("li", {}, el("bdi", {}, d.serial), ` — ${d.state}: ${hint(d)}`, d.reason && d.state !== "unauthorized" && d.state !== "offline" ? el("div", { class: "help", dir: "ltr" }, d.reason) : "")))),
         );
       }
     }
