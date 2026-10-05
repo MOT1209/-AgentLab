@@ -201,3 +201,19 @@ test("agents receive their routed provider as ctx.llm; none configured means und
   const bare = initializeAgentLab({ devices: createMockFleet(12), behaviors: { "MAIN-03-A": { ask } } });
   assert.equal(((await bare.orchestrator.dispatch("MAIN-03", "ask", {})).result as AgentResult).children![0]!.summary, "no-llm");
 });
+
+test("structured-output hint and abort signal are passed to the providers", async () => {
+  const schema = { type: "object", properties: { a: { type: "string" } } };
+  const ac = new AbortController();
+  let params: Record<string, unknown> | undefined;
+  let opts: unknown;
+  const fake = { messages: { create: async (p: Record<string, unknown>, o: unknown) => ((params = p), (opts = o), { model: "m", stop_reason: "end_turn", content: [{ type: "text", text: "{}" }], usage: { input_tokens: 1, output_tokens: 1 } }) } } as unknown as Anthropic;
+  await new AnthropicProvider(anthropicCfg, KEY, fake).complete({ messages: [{ role: "user", content: "q" }], jsonSchema: { name: "x", schema }, signal: ac.signal });
+  assert.deepEqual(params!.output_config, { format: { type: "json_schema", schema } });
+  assert.equal((opts as { signal: AbortSignal }).signal, ac.signal);
+
+  let body: Record<string, unknown> = {};
+  const f = async (_u: string, init: RequestInit) => ((body = JSON.parse(init.body as string)), new Response(JSON.stringify({ choices: [{ message: { content: "{}" } }] })));
+  await new OpenAICompatibleProvider(openaiCfg, undefined, f).complete({ messages: [{ role: "user", content: "q" }], jsonSchema: { name: "x", schema } });
+  assert.deepEqual(body.response_format, { type: "json_schema", json_schema: { name: "x", schema } });
+});

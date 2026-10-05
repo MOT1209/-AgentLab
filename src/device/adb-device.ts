@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { Device, DeviceError, DeviceInfo, DeviceSource, DeviceState } from "./types.js";
+import { parseUiAutomatorXml } from "./ui-parse.js";
+import { Device, DeviceError, DeviceInfo, DeviceKey, DeviceSource, DeviceState, UiNode } from "./types.js";
 
 const run = promisify(execFile);
 const PKG = /^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$/;
@@ -62,6 +63,23 @@ export class AdbDevice implements Device {
     // adb input text needs %s for spaces; strip shell-significant chars.
     const safe = text.replace(/[^A-Za-z0-9 @._-]/g, "").replace(/ /g, "%s");
     await this.adb(["shell", "input", "text", safe]);
+  }
+  async swipe(x1: number, y1: number, x2: number, y2: number, durationMs = 300): Promise<void> {
+    const n = [x1, y1, x2, y2, durationMs].map((v) => String(Math.trunc(Number(v))));
+    if (n.some((v) => !/^\d+$/.test(v))) throw new DeviceError("swipe: coordinates must be non-negative integers", this.id);
+    await this.adb(["shell", "input", "swipe", ...n]);
+  }
+  async pressKey(key: DeviceKey): Promise<void> {
+    const code = { BACK: "KEYCODE_BACK", HOME: "KEYCODE_HOME" }[key];
+    if (!code) throw new DeviceError(`unsupported key: ${String(key)}`, this.id);
+    await this.adb(["shell", "input", "keyevent", code]);
+  }
+  async clearLogs(): Promise<void> {
+    await this.adb(["logcat", "-c"]);
+  }
+  async ui(): Promise<UiNode[]> {
+    const xml = String(await this.adb(["exec-out", "uiautomator", "dump", "/dev/tty"]));
+    return parseUiAutomatorXml(xml);
   }
   async logs(lines = 200): Promise<string> {
     return String(await this.adb(["logcat", "-d", "-t", String(lines)]));

@@ -29,3 +29,10 @@ Format: date — decision — reason
 - Provider routing: agent override, then MAIN parent override, then default. Handlers get optional ctx.llm; deterministic agents work without providers.
 - Consumer subscriptions are NOT supported as a provider: no API access, and using subscription tokens in third-party software is not something to build on (verify current terms before reconsidering).
 - Anthropic server-side refusal fallback is opt-in (serverSideFallback) because it is a beta parameter not yet verified against the live API from this repo.
+- Phase 4: the LLM returns ONE flat JSON object per turn (action, reason, params). validateDecision is the only gate; unknown keys are ignored and never read. No action takes a package name: LAUNCH/STOP use the task's app.packageName.
+- The model gets text only (UI elements with tap centers, error log lines, evidence ids). Screenshots are stored as evidence, not sent. Vision input is not supported by the provider layer.
+- Structured output is a hint (LlmRequest.jsonSchema); the agent always validates. One correction attempt for malformed output, no more.
+- maxSteps counts executed actions (including failed ones), not END_TEST; checked before each LLM call. Timeout and cancellation share one AbortController; LLM calls are raced against it.
+- Findings are split: VERIFIED (system-detected crash markers) vs AI_OBSERVATION. Only VERIFIED MEDIUM+ turns the platform TaskStatus into FAILED.
+- Device was extended with optional swipe/pressKey/ui/clearLogs; capabilities swipe and press_key added; inspect_ui is now implemented.
+- The exploration timer is NOT unref'd (found by tests: an unref'd timer lets the process exit with the run pending).

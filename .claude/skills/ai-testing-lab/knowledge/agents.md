@@ -61,3 +61,8 @@ Source of truth in code: `src/agents/organization.ts`. A test keeps this file in
 
 - MAIN-12-A Result Validation Agent
 - MAIN-12-B Report Analysis Agent
+
+## Implemented behaviors
+
+- MAIN-01-B: `smoke` (deterministic).
+- MAIN-05-A: `explore` — LLM-driven loop (src/agents/exploration/). MAIN-05-B and all others: no behavior yet (BLOCKED).

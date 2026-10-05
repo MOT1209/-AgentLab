@@ -34,6 +34,7 @@ export class OpenAICompatibleProvider implements LlmProvider {
       model: this.model,
       max_tokens: req.maxTokens ?? this.config.maxTokens ?? DEFAULT_MAX_TOKENS,
       messages: [...(req.system ? [{ role: "system", content: req.system }] : []), ...req.messages],
+      ...(req.jsonSchema ? { response_format: { type: "json_schema", json_schema: { name: req.jsonSchema.name, schema: req.jsonSchema.schema } } } : {}),
     };
     let res: Response;
     try {
@@ -41,7 +42,7 @@ export class OpenAICompatibleProvider implements LlmProvider {
         method: "POST",
         headers: { "content-type": "application/json", ...(this.apiKey ? { authorization: `Bearer ${this.apiKey}` } : {}) },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(this.config.timeoutMs ?? 120_000),
+        signal: req.signal ? AbortSignal.any([req.signal, AbortSignal.timeout(this.config.timeoutMs ?? 120_000)]) : AbortSignal.timeout(this.config.timeoutMs ?? 120_000),
       });
     } catch (e) {
       throw new ProviderError("UNAVAILABLE", this.clean(e instanceof Error ? e.message : String(e)), this.id, true);

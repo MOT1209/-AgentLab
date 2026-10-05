@@ -1,22 +1,15 @@
 # CURRENT PHASE
 
-Phase 3 — Device runtime done (52 tests pass, typecheck clean).
-src/runtime/: DeviceRegistry, DevicePool (leases), DeviceManager (assignments, health, discovery, withLease), RuntimeContext.
-Agents no longer hold a Device: AgentDeps.devices is a DeviceManager. MAIN agents lease their assigned device per task;
-sub-agents run under the parent's lease and see it via HandlerContext.device / runtime.
-initializeAgentLab({ devices | deviceManager, assignments: "auto" | "none" | Record }) — no implicit mock fleet.
-createMockFleet(12) gives DEVICE-01..12 for development.
+Phase 4 — first real LLM-driven agent done: MAIN-05-A Exploration Agent (98 tests pass, typecheck + build clean).
+See knowledge/exploration.md. Earlier: agent framework (P2), device runtime (P3), providers (P3.5).
 
-Providers (Phase 3.5): src/providers/ — ProviderManager, AnthropicProvider (SDK), OpenAICompatibleProvider (fetch), MockProvider, config validation. initializeAgentLab({ providers }). 65 tests pass.
-No agent calls an LLM yet: ctx.llm exists, but no handler uses it.
+Flow: orchestrator.dispatch("MAIN-05","explore",payload,{signal}) → MAIN-05 leases DEVICE-05 → MAIN-05-A runs
+runExploration(ctx.llm, leased device) → ExplorationResult (ChildOutcome.details) → released.
+Only MAIN-01-B (smoke) and MAIN-05-A (explore) have behavior; the other 22 sub-agents report BLOCKED. MAIN-05-B untouched.
 
 ## Next
-- Real LLM-driven behavior for one agent (e.g. Exploration Agent) using ctx.llm
-- Verify AnthropicProvider and OpenAICompatibleProvider against live APIs (only tested with fakes)
-- Cost controls: per-provider token/cost budget and usage accounting
-- Validate AdbDevice and AdbDiscovery on a real device/emulator (still untested; only the parser is unit-tested)
-- Real behaviors for more SUB agents (only MAIN-01-B "smoke" exists; the other 23 report BLOCKED)
-- Clear logcat before launch; crash detection beyond regex
-- Persistence for tasks/evidence/messages/leases
-- Dynamic device allocation (MAIN without a fixed device takes any free one) if 12 physical devices are unrealistic
-- API layer + dashboard (later)
+- RUN IT FOR REAL: AdbDevice (swipe/pressKey/ui/clearLogs), a real emulator, a real provider key. Nothing live has been verified.
+- Cost control: budget per provider/run (usage is counted in telemetry but not capped)
+- Edge Case Agent (MAIN-05-B) reusing runExploration with a different system prompt/strategy
+- Persistence of runs/evidence; report output (JSON/Markdown)
+- Dynamic device allocation if fewer than 12 devices

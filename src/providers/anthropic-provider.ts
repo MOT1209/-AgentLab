@@ -31,11 +31,13 @@ export class AnthropicProvider implements LlmProvider {
       max_tokens: req.maxTokens ?? this.config.maxTokens ?? DEFAULT_MAX_TOKENS,
       ...(req.system ? { system: req.system } : {}),
       messages: req.messages.map((m) => ({ role: m.role, content: m.content })),
+      ...(req.jsonSchema ? { output_config: { format: { type: "json_schema" as const, schema: req.jsonSchema.schema } } } : {}),
     };
+    const opts = req.signal ? { signal: req.signal } : undefined;
     try {
       const msg = this.config.serverSideFallback
-        ? await this.client.beta.messages.create({ ...params, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" } as never)
-        : await this.client.messages.create(params);
+        ? await this.client.beta.messages.create({ ...params, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" } as never, opts)
+        : await this.client.messages.create(params, opts);
       const text = (msg.content as { type: string; text?: string }[])
         .filter((b) => b.type === "text")
         .map((b) => b.text ?? "")

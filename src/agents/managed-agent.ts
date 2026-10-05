@@ -3,7 +3,7 @@ import type { DeviceManager } from "../runtime/device-manager.js";
 import type { ProviderManager } from "../providers/manager.js";
 import type { LlmProvider } from "../providers/types.js";
 import type { RuntimeContext } from "../runtime/types.js";
-import { Agent } from "./base.js";
+import { Agent, type RunOptions } from "./base.js";
 import type { Capability } from "./capabilities.js";
 import { AgentDefinition, AgentStatus, BUSY_STATUSES } from "./definitions.js";
 import { MessageBus, createMessage } from "./messages.js";
@@ -23,6 +23,8 @@ export interface HandlerContext {
   /** The device assigned to this agent's MAIN agent. Exclusively leased for the duration of the task. */
   device: Device;
   runtime: RuntimeContext;
+  /** Cancellation signal from the dispatcher, if any. */
+  signal?: AbortSignal;
   /** The LLM provider routed to this agent (its own override, its MAIN's, or the default). */
   llm?: LlmProvider;
   definition: AgentDefinition;
@@ -96,7 +98,7 @@ export abstract class ManagedAgent extends Agent {
     this.setStatus("IDLE");
   }
 
-  override async run(task: Task) {
+  override async run(task: Task, opts: RunOptions = {}) {
     if (this.current === "PAUSED" || this.current === "OFFLINE" || this.isBusy()) {
       task.status = "BLOCKED";
       task.errors.push(`${this.id} cannot accept tasks while ${this.current}`);
@@ -104,7 +106,7 @@ export abstract class ManagedAgent extends Agent {
       return task as Awaited<ReturnType<Agent["run"]>>;
     }
     this.setStatus("EXECUTING");
-    const done = await super.run(task);
+    const done = await super.run(task, opts);
     // ERROR means this agent itself failed (exception, no result). A child's ERROR that was
     // aggregated into a result does not make the parent unhealthy. It persists until the next accepted task.
     this.setStatus(done.status === "ERROR" && done.result === undefined ? "ERROR" : "IDLE");

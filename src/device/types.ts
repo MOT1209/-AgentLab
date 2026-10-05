@@ -10,6 +10,20 @@ export interface DeviceInfo {
   androidVersion: string;
 }
 
+/** A visible UI element, from the accessibility hierarchy. */
+export interface UiNode {
+  text: string;
+  desc: string;
+  id: string;
+  cls: string;
+  pkg: string;
+  clickable: boolean;
+  enabled: boolean;
+  bounds: { l: number; t: number; r: number; b: number };
+}
+
+export type DeviceKey = "BACK" | "HOME";
+
 export interface Device {
   readonly id: string;
   /** Provenance, if the adapter knows it. */
@@ -23,6 +37,12 @@ export interface Device {
   tap(x: number, y: number): Promise<void>;
   type(text: string): Promise<void>;
   logs(lines?: number): Promise<string>;
+  // Optional capabilities. Callers must check before use.
+  swipe?(x1: number, y1: number, x2: number, y2: number, durationMs?: number): Promise<void>;
+  pressKey?(key: DeviceKey): Promise<void>;
+  /** Current UI hierarchy. */
+  ui?(): Promise<UiNode[]>;
+  clearLogs?(): Promise<void>;
 }
 
 export class DeviceError extends Error {

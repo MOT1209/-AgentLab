@@ -8,6 +8,13 @@ export interface LlmMessage {
 
 export interface LlmRequest {
   system?: string;
+  /**
+   * Ask the provider to constrain output to this JSON Schema, where it supports that.
+   * It is a hint: callers must still validate the result.
+   */
+  jsonSchema?: { name: string; schema: Record<string, unknown> };
+  /** Aborts the request. */
+  signal?: AbortSignal;
   messages: readonly LlmMessage[];
   maxTokens?: number;
 }

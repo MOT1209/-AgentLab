@@ -1,5 +1,6 @@
 import { DeviceError } from "../device/types.js";
 import { DEVICE_CAPABILITIES } from "./capabilities.js";
+import type { RunOptions } from "./base.js";
 import { AgentDeps, HandlerMap, ManagedAgent } from "./managed-agent.js";
 import type { AgentDefinition } from "./definitions.js";
 import type { AgentResult, Task } from "./types.js";
@@ -18,7 +19,7 @@ export class SubAgent extends ManagedAgent {
     return Object.hasOwn(this.handlers, taskType);
   }
 
-  protected async execute(task: Task): Promise<AgentResult> {
+  protected async execute(task: Task, opts: RunOptions): Promise<AgentResult> {
     if (!this.canHandle(task.type)) {
       return { status: "BLOCKED", summary: `${this.id} has no handler for task type '${task.type}'`, evidence: [] };
     }
@@ -39,7 +40,7 @@ export class SubAgent extends ManagedAgent {
     if (!device) return { status: "BLOCKED", summary: `device ${runtime.deviceId} is no longer registered`, evidence: [] };
     try {
       const llm = this.deps.providers?.forAgent(this.id, this.rootMainId);
-      return await handler.handle({ task, device, runtime, definition: this.definition, ...(llm ? { llm } : {}) });
+      return await handler.handle({ task, device, runtime, definition: this.definition, ...(llm ? { llm } : {}), ...(opts.signal ? { signal: opts.signal } : {}) });
     } catch (e) {
       // An unavailable device is an environment problem, not an agent fault.
       if (e instanceof DeviceError) return { status: "BLOCKED", summary: e.message, evidence: [] };

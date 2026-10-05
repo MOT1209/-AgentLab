@@ -15,8 +15,15 @@ export interface Task<P = unknown, R = unknown> {
   timestamps: { created: string; started?: string; finished?: string };
 }
 
+export type EvidenceKind = "screenshot" | "log" | "action_result" | "ui_state" | "error" | "performance";
+
 export interface Evidence {
-  kind: "screenshot" | "log";
+  /** Stable reference, e.g. EV-007. Optional for evidence from simple handlers. */
+  id?: string;
+  kind: EvidenceKind;
+  /** Execution step that produced it (exploration agents). */
+  step?: number;
+  at?: string;
   data: string; // base64 for binary, text for logs
   /** Id of the agent that produced it. */
   source?: string;
@@ -27,6 +34,8 @@ export interface ChildOutcome {
   taskId: string;
   status: TaskStatus;
   summary: string;
+  /** The child's AgentResult.details, passed up unchanged. */
+  details?: unknown;
 }
 
 export interface AgentResult {
@@ -35,4 +44,6 @@ export interface AgentResult {
   evidence: Evidence[];
   /** Present on results produced by delegation. */
   children?: ChildOutcome[];
+  /** Handler-specific structured result (e.g. an ExplorationResult). */
+  details?: unknown;
 }

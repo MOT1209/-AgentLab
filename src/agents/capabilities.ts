@@ -13,6 +13,8 @@ export const CAPABILITIES = [
   "screenshot",
   "logs",
   "device_info",
+  "swipe",
+  "press_key",
   "screen_recording",
   "inspect_ui",
   "network_control",
@@ -32,10 +34,11 @@ export function isCapability(value: unknown): value is Capability {
 /** Capabilities that depend on the device. The rest are pure analysis. */
 export const DEVICE_CAPABILITIES: readonly Capability[] = [
   "install_app", "launch_app", "stop_app", "tap", "type", "screenshot", "logs", "device_info",
-  "screen_recording", "inspect_ui", "network_control",
+  "swipe", "press_key", "screen_recording", "inspect_ui", "network_control",
 ];
 
 /** Device capabilities the Device interface really implements today. */
 export const IMPLEMENTED_DEVICE_CAPABILITIES: readonly Capability[] = [
   "install_app", "launch_app", "stop_app", "tap", "type", "screenshot", "logs", "device_info",
+  "swipe", "press_key", "inspect_ui",
 ];

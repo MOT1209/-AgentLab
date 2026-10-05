@@ -1,4 +1,4 @@
-import { Device, DeviceError, DeviceInfo, DeviceState } from "./types.js";
+import { Device, DeviceError, DeviceInfo, DeviceKey, DeviceState, UiNode } from "./types.js";
 
 /** In-memory device for tests and development without hardware. */
 export class MockDevice implements Device {
@@ -7,6 +7,10 @@ export class MockDevice implements Device {
   private running = new Set<string>();
   readonly calls: string[] = [];
   readonly source = "MOCK" as const;
+  /** Human-readable record of device operations, e.g. "tap:10,20". */
+  readonly trace: string[] = [];
+  private extraLogs: string[] = [];
+  private uiNodes: UiNode[] = [];
 
   constructor(readonly id = "mock-1") {}
 
@@ -31,6 +35,7 @@ export class MockDevice implements Device {
   async launch(pkg: string): Promise<void> {
     this.guard("launch");
     this.running.add(pkg);
+    this.trace.push(`launch:${pkg}`);
   }
   async stop(pkg: string): Promise<void> {
     this.guard("stop");
@@ -40,15 +45,40 @@ export class MockDevice implements Device {
     this.guard("screenshot");
     return Buffer.from("mock-png");
   }
-  async tap(): Promise<void> {
+  async tap(x: number, y: number): Promise<void> {
     this.guard("tap");
+    this.trace.push(`tap:${x},${y}`);
   }
-  async type(): Promise<void> {
+  async type(text: string): Promise<void> {
     this.guard("type");
+    this.trace.push(`type:${text}`);
+  }
+  async swipe(x1: number, y1: number, x2: number, y2: number, durationMs = 300): Promise<void> {
+    this.guard("swipe");
+    this.trace.push(`swipe:${x1},${y1}>${x2},${y2}@${durationMs}`);
+  }
+  async pressKey(key: DeviceKey): Promise<void> {
+    this.guard("pressKey");
+    this.trace.push(`key:${key}`);
+  }
+  async clearLogs(): Promise<void> {
+    this.guard("clearLogs");
+    this.extraLogs = [];
+  }
+  async ui(): Promise<UiNode[]> {
+    this.guard("ui");
+    return this.uiNodes;
   }
   async logs(): Promise<string> {
     this.guard("logs");
-    return [...this.running].map((p) => `I/${p}: running`).join("\n");
+    return [...[...this.running].map((p) => `I/${p}: running`), ...this.extraLogs].join("\n");
+  }
+  /** Test helpers. */
+  appendLog(line: string): void {
+    this.extraLogs.push(line);
+  }
+  setUi(nodes: UiNode[]): void {
+    this.uiNodes = nodes;
   }
   isRunning(pkg: string): boolean {
     return this.running.has(pkg);

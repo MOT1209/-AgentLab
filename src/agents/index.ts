@@ -13,3 +13,4 @@ export * from "./types.js";
 export * from "./validation.js";
 export { DEFAULT_BEHAVIORS } from "./behaviors/index.js";
 export { smokeHandler, type SmokePayload } from "./behaviors/smoke.js";
+export * from "./exploration/index.js";
