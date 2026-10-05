@@ -1,5 +1,12 @@
 # CURRENT PHASE
 
+Phase 5, Step 1 — provider presets added (src/providers/presets.ts): openai, groq, openrouter,
+together, fireworks, ollama. A config sets `"preset": "<id>"` to fill in `baseUrl` for
+openai-compatible instead of hand-writing it; an explicit baseUrl still wins. 100 tests pass,
+typecheck + build clean. Next: Phase 5 Step 2 — Backend/API layer (see decisions.md).
+"OpenCode/Zen" was requested by the user as a provider but its API shape is unconfirmed — not
+added as a preset yet.
+
 Phase 4 — first real LLM-driven agent done: MAIN-05-A Exploration Agent (98 tests pass, typecheck + build clean).
 See knowledge/exploration.md. Earlier: agent framework (P2), device runtime (P3), providers (P3.5).
 

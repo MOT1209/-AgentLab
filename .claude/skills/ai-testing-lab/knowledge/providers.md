@@ -4,8 +4,15 @@ Code: src/providers/. Example config: providers.example.json.
 
 Kinds:
 - anthropic — official @anthropic-ai/sdk, API key. Optional `serverSideFallback` (beta, off by default, not yet exercised live).
-- openai-compatible — POST {baseUrl}/chat/completions. OpenAI, OpenRouter, Ollama, LM Studio, vLLM. Needs baseUrl.
+- openai-compatible — POST {baseUrl}/chat/completions. Needs baseUrl (or a preset, see below).
 - mock — tests and offline development.
+
+Presets (src/providers/presets.ts): named shortcuts for common `openai-compatible` endpoints —
+`openai`, `groq`, `openrouter`, `together`, `fireworks`, `ollama` (local, no key). Set
+`"preset": "groq"` on a config instead of hand-writing `baseUrl`; `id`, `model` and `auth` are
+still supplied by the caller as usual. An explicit `baseUrl` always wins over a preset's default.
+"OpenCode/Zen" was raised by a user as a provider to add — its API/auth shape has not been
+investigated yet; do not add it as a preset without confirming its integration shape first.
 
 Rules:
 - Config holds only the NAME of the env var (`auth.env`). A key in config is rejected and never echoed.

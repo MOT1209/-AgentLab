@@ -1,13 +1,26 @@
 import { readFileSync } from "node:fs";
+import { resolvePreset } from "./presets.js";
 import { PROVIDER_KINDS, ProviderConfig, ProviderError } from "./types.js";
 
 const ENV_NAME = /^[A-Z][A-Z0-9_]*$/;
 const SECRET_LOOKING = /^(sk-|sk_|AIza|ghp_|xox[bap]-|Bearer\s)/i;
 
+/**
+ * Fills `baseUrl` from a named preset (see providers/presets.ts) when the config
+ * references one and doesn't already set baseUrl itself. Leaves everything else,
+ * including validation of the preset id, to validateProviderConfig.
+ */
+function applyPreset(input: Record<string, unknown>): Record<string, unknown> {
+  if (typeof input.preset !== "string") return input;
+  const preset = resolvePreset(input.preset);
+  if (!preset || input.baseUrl !== undefined) return input;
+  return { ...input, baseUrl: preset.baseUrl };
+}
+
 /** Returns the problems with a config, or []. Never echoes secret-looking values. */
-export function validateProviderConfig(input: unknown): string[] {
-  if (typeof input !== "object" || input === null) return ["config must be an object"];
-  const c = input as Record<string, unknown>;
+export function validateProviderConfig(rawInput: unknown): string[] {
+  if (typeof rawInput !== "object" || rawInput === null) return ["config must be an object"];
+  const c = applyPreset(rawInput as Record<string, unknown>);
   const label = typeof c.id === "string" && c.id ? c.id : "<no id>";
   const p: string[] = [];
   const bad = (m: string) => p.push(`${label}: ${m}`);
@@ -16,6 +29,7 @@ export function validateProviderConfig(input: unknown): string[] {
   if (!PROVIDER_KINDS.includes(c.kind as never)) bad(`kind must be one of ${PROVIDER_KINDS.join(", ")}`);
   if (typeof c.model !== "string" || c.model.trim() === "") bad("model is required");
   else if (/^REPLACE/i.test(c.model)) bad("model is still a placeholder");
+  if (c.preset !== undefined && !resolvePreset(c.preset as string)) bad(`preset '${c.preset as string}' is not known`);
 
   const a = c.auth as Record<string, unknown> | undefined;
   if (typeof a !== "object" || a === null) {
@@ -48,7 +62,7 @@ export function assertProviderConfig(input: unknown): ProviderConfig {
     const id = typeof (input as { id?: unknown })?.id === "string" ? (input as { id: string }).id : "unknown";
     throw new ProviderError("CONFIG", problems.join("; "), id);
   }
-  return input as ProviderConfig;
+  return applyPreset(input as Record<string, unknown>) as unknown as ProviderConfig;
 }
 
 export interface ProviderFile {

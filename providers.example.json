@@ -15,9 +15,23 @@
     {
       "id": "local-ollama",
       "kind": "openai-compatible",
-      "baseUrl": "http://localhost:11434/v1",
+      "preset": "ollama",
       "model": "REPLACE_WITH_A_MODEL_YOU_HAVE_PULLED",
       "auth": { "type": "none" }
+    },
+    {
+      "id": "groq-llama",
+      "kind": "openai-compatible",
+      "preset": "groq",
+      "model": "llama-3.3-70b-versatile",
+      "auth": { "type": "api_key", "env": "GROQ_API_KEY" }
+    },
+    {
+      "id": "openrouter-auto",
+      "kind": "openai-compatible",
+      "preset": "openrouter",
+      "model": "openrouter/auto",
+      "auth": { "type": "api_key", "env": "OPENROUTER_API_KEY" }
     }
   ],
   "default": "claude-cheap",

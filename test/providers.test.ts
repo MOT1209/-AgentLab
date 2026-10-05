@@ -5,9 +5,10 @@ import { AnthropicProvider } from "../src/providers/anthropic-provider.js";
 import { OpenAICompatibleProvider } from "../src/providers/openai-compatible-provider.js";
 import { MockProvider } from "../src/providers/mock-provider.js";
 import { ProviderManager } from "../src/providers/manager.js";
-import { parseProviderFile, validateProviderConfig } from "../src/providers/config.js";
+import { assertProviderConfig, parseProviderFile, validateProviderConfig } from "../src/providers/config.js";
 import { redact } from "../src/providers/secrets.js";
 import { ProviderError, type ProviderConfig } from "../src/providers/types.js";
+import { PROVIDER_PRESETS, resolvePreset } from "../src/providers/presets.js";
 import { initializeAgentLab } from "../src/bootstrap.js";
 import { createMockFleet } from "../src/device/mock-device.js";
 import type { TaskHandler } from "../src/agents/managed-agent.js";
@@ -44,6 +45,23 @@ test("config: parseProviderFile validates every provider and rejects bad JSON", 
   assert.throws(() => parseProviderFile("{nope"), /not valid JSON/);
   assert.throws(() => parseProviderFile("{}"), /providers/);
   assert.throws(() => parseProviderFile(JSON.stringify({ providers: [{ ...anthropicCfg, model: "" }] })), /model is required/);
+});
+
+test("presets: resolve baseUrl, reject unknown preset ids, never require a key to be embedded", () => {
+  for (const preset of PROVIDER_PRESETS) {
+    assert.equal(resolvePreset(preset.id), preset);
+    const cfg = { id: preset.id, kind: "openai-compatible", preset: preset.id, model: preset.exampleModel, auth: preset.requiresKey ? { type: "api_key", env: preset.defaultEnv || "SOME_KEY" } : { type: "none" } };
+    assert.deepEqual(validateProviderConfig(cfg), []);
+    assert.equal(assertProviderConfig(cfg).baseUrl, preset.baseUrl);
+  }
+  assert.equal(resolvePreset("nope"), undefined);
+  const bad = { id: "x", kind: "openai-compatible", preset: "nope", model: "m", auth: { type: "none" } };
+  assert.ok(validateProviderConfig(bad).some((p) => p.includes("not known")));
+});
+
+test("presets: an explicit baseUrl always wins over the preset's default", () => {
+  const cfg = { id: "custom-groq", kind: "openai-compatible", preset: "groq", baseUrl: "https://my-proxy.example.com/v1", model: "llama-3.3-70b-versatile", auth: { type: "api_key", env: "GROQ_API_KEY" } };
+  assert.equal(assertProviderConfig(cfg).baseUrl, "https://my-proxy.example.com/v1");
 });
 
 test("manager: key comes from the environment and a missing key fails closed", () => {

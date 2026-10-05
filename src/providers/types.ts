@@ -66,6 +66,8 @@ export interface ProviderConfig {
   auth: ProviderAuth;
   /** Required for openai-compatible. Optional override for anthropic (proxies, gateways). */
   baseUrl?: string;
+  /** Optional named shortcut (see providers/presets.ts) that fills in baseUrl when omitted. */
+  preset?: string;
   maxTokens?: number;
   timeoutMs?: number;
   /**
