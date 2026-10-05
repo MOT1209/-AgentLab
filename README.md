@@ -52,7 +52,8 @@ Full 36-agent list: [`.claude/skills/ai-testing-lab/knowledge/agents.md`](.claud
 | `MAIN-01-B` smoke test (install, launch, screenshot, crash-in-logs check) | Built, tested (mock) |
 | `MAIN-05-A` Exploration Agent (LLM-driven loop) | Built, tested (mock device + scripted LLM). **Never run live.** |
 | The other 22 sub-agents | Registered, **no behavior**. They return `BLOCKED`. |
-| CLI, API, dashboard, persistence, cost caps, vision | **Not built** |
+| Local web UI (`npm run ui`): demo run verified in a headless browser; real-device mode never run | Built |
+| Persistence, cost caps, vision, multi-user/remote access | **Not built** |
 
 Limitations that matter in practice:
 
@@ -78,14 +79,24 @@ npm test          # typecheck + build + all tests, fully offline
 
 Other scripts: `npm run typecheck`, `npm run build`.
 
-There is no full CLI yet; AgentLab is a library (`src/index.ts`) plus one runnable example, `examples/explore.ts`:
+### Easiest: the web UI
 
 ```bash
-npm run explore -- --mock                      # offline demo, nothing needed
-npm run explore -- --package com.example.app   # real device + ANTHROPIC_API_KEY
+npm run ui
 ```
 
-It writes `out/<task-id>/report.json` and the screenshots as PNG files.
+It prints a link like `http://127.0.0.1:4173/?token=...` and opens it in your browser. From there:
+
+1. **Demo mode** (default): press *Start test*. A scripted run with a fake phone shows the whole screen (steps, screenshots, findings, report) with no device and no key. It proves the UI works; it does not test a real app.
+2. **Real device mode**: pick *Real device*, then (1) *Find devices* (needs `adb`, and an emulator or a phone with USB debugging), (2) choose the AI model and paste your API key, (3) enter the app's package name (the app must already be installed) and press *Start test*. You can stop a run at any time.
+
+The UI is Arabic or English (switch at the top). Safety properties: it listens on `127.0.0.1` only; every API call needs the random token from the link; your API key is kept in memory only, never written to disk and never sent back to the browser; model and app text is rendered as plain text. Options: `npm run ui -- --port 4174`, `--no-open`.
+
+> The real-device path has never been run on real hardware. Expect to hit errors and send them back.
+
+### Command line
+
+`npm run explore -- --mock` (offline demo) or `npm run explore -- --package com.example.app` (real device + `ANTHROPIC_API_KEY`). It writes `out/<task-id>/report.json` and the screenshots as PNG files. Otherwise AgentLab is a library (`src/index.ts`).
 
 ### Control Center (web UI)
 
@@ -257,6 +268,7 @@ src/
   device/            Device interface, MockDevice, AdbDevice, UI parser
   providers/         Anthropic, OpenAI-compatible, Mock, manager, config
   skills/            skill catalog, permissions, registry, resolver, profiles, sync/validate CLI
+  ui/                local web UI: server, page, app state, demo screens
   bootstrap.ts       initializeAgentLab()
   orchestrator.ts    dispatch (with cancellation)
 examples/            runnable example (explore.ts)

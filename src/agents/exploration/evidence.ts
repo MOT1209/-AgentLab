@@ -9,6 +9,8 @@ export interface EvidenceLimits {
 export class EvidenceStore {
   private readonly items: Evidence[] = [];
   private screenshots = 0;
+  /** Called for every stored item. Used for live UIs; must not throw. */
+  onAdd?: (ev: Evidence) => void;
 
   constructor(
     private readonly source: string,
@@ -36,6 +38,11 @@ export class EvidenceStore {
       source: this.source,
     };
     this.items.push(ev);
+    try {
+      this.onAdd?.(ev);
+    } catch {
+      /* a listener must never break a run */
+    }
     return ev;
   }
 

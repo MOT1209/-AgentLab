@@ -33,3 +33,6 @@
 - Control Center UI has only been exercised in headless Chromium against mocks; no real device/adb/LLM, no mobile-browser pass, and POST /providers lets any caller who can reach the port register a provider that reads any env var NAME present on the server (including unrelated secrets) — MEDIUM — open (needs auth or an allowlist before any non-local use)
 - No request body size limit on POST routes (readJsonBody buffers the whole body) — LOW — open
 - GET /events has no reconnection/backlog support: a client that connects after a run started misses earlier messages (bus.history() exists but isn't replayed on connect) — LOW — open
+- UI real-device mode (device list, key entry, run) has never been exercised against real adb or a live LLM — HIGH — open
+- UI is single-user, single-run, in-memory: refresh keeps the run (server side) but a server restart loses it; no auth beyond the launch token — LOW — open
+- UI polls /api/state once a second and resends all events; fine for <=1000 events, wasteful beyond — LOW — open

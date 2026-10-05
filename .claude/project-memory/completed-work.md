@@ -8,3 +8,4 @@
 - Phase 5: provider presets, Backend/API (node:http + SSE), bilingual AR/EN Control Center web UI, ADB_PATH + device auto-assignment fix; merged to main at ba689dd; 112 tests pass.
 - Phase 6: skill architecture (catalog, registry, resolver, permissions, 36 least-privilege profiles, generated .claude/.agent skills with sync/validate tooling, runtime permission + limit enforcement); 154 tests pass.
 - Phase 4: Exploration Agent (MAIN-05-A): typed action model + validator + safe executor, bounded LLM loop (maxSteps/timeout/cancel), evidence + findings (verified vs AI), Device swipe/pressKey/ui/clearLogs (+AdbDevice), provider jsonSchema/signal, MockProvider scripting; 98 tests pass.
+- UI: local web UI (npm run ui), AR/EN, demo + real modes, live steps/screenshots/findings, cancel, report download; server security tests; 108 tests pass; demo flow checked in headless Chromium.

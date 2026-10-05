@@ -37,6 +37,8 @@ export interface ExplorationDeps {
   now?: () => number;
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
   log?: Logger;
+  /** Live events for UIs: started, evidence, action, finding, finished. Errors thrown here are ignored. */
+  onProgress?: (event: Record<string, unknown>) => void;
 }
 
 /** The smaller of what the task asked for and what the agent's profile allows. */
@@ -85,6 +87,16 @@ export async function runExploration(deps: ExplorationDeps): Promise<Exploration
   else deps.signal?.addEventListener("abort", onExternalAbort, { once: true });
 
   let conclusion: string | undefined;
+  const emit = (event: Record<string, unknown>) => {
+    try {
+      deps.onProgress?.(event);
+    } catch {
+      /* ignore */
+    }
+  };
+  evidence.onAdd = (ev) => {
+    if (ev.kind === "screenshot") emit({ kind: "screenshot", id: ev.id, step: ev.step, data: ev.data });
+  };
 
   const finish = (status: ExplorationStatus, why: string): ExplorationResult => {
     const all = findings.all();
@@ -94,6 +106,7 @@ export async function runExploration(deps: ExplorationDeps): Promise<Exploration
       `${status}: ${tel.actions} action(s), ${all.length} finding(s) (${verified} verified, ${all.length - verified} AI-observed). ${why}` +
       (conclusion ? ` Agent's own conclusion (unverified): "${conclusion.slice(0, 300)}"` : "");
     log("finished", { agentId, taskId, status, steps: tel.actions });
+    emit({ kind: "finished", status });
     return {
       status,
       taskId,
@@ -160,6 +173,7 @@ export async function runExploration(deps: ExplorationDeps): Promise<Exploration
         const f = findings.addVerified(crash.signature, "CRITICAL", crash.title, `Detected in device logs after step ${step}: ${crash.excerpt.split("\n")[0]}`, [logEv?.id, obs.screenshotRef].filter((x): x is string => !!x), step);
         if (f) {
           errors.push(`CRASH DETECTED (${f.id}): ${crash.title}`);
+          emit({ kind: "finding", id: f.id, severity: f.severity, title: f.title, source: f.source });
           log("crash", { agentId, finding: f.id, step });
           await device.clearLogs?.().catch(() => undefined);
         }
@@ -174,6 +188,7 @@ export async function runExploration(deps: ExplorationDeps): Promise<Exploration
 
   try {
     log("started", { agentId, taskId, deviceId: deps.deviceId, maxSteps: task.maxSteps });
+    emit({ kind: "started", maxSteps: task.maxSteps });
 
     let { obs, deviceError } = await observe(0);
     if (deviceError && !(await deviceAlive())) {
@@ -209,7 +224,8 @@ export async function runExploration(deps: ExplorationDeps): Promise<Exploration
       const { decision } = out;
 
       if (decision.finding) {
-        findings.addObservation(decision.finding, obs.screenshotRef ? [obs.screenshotRef] : [], tel.actions);
+        const f = findings.addObservation(decision.finding, obs.screenshotRef ? [obs.screenshotRef] : [], tel.actions);
+        emit({ kind: "finding", id: f.id, severity: f.severity, title: f.title, source: f.source });
       }
       if (decision.action.action === "END_TEST") {
         conclusion = decision.reason;
@@ -225,6 +241,7 @@ export async function runExploration(deps: ExplorationDeps): Promise<Exploration
       log("action", { agentId, step, action: decision.action.action, reason: decision.reason.slice(0, 120) });
       const result = await executor.execute(decision.action, step, ctrl.signal);
       history.push({ step, action: decision.action.action, reason: decision.reason, ok: result.ok, detail: result.detail, evidenceIds: result.evidenceIds });
+      emit({ kind: "action", step, action: decision.action.action, params: decision.action, reason: decision.reason, ok: result.ok, detail: result.detail });
       if (!result.ok) {
         tel.actionFailures++;
         log("action_failed", { agentId, step, detail: result.detail.slice(0, 120) });
@@ -271,6 +288,7 @@ export const explorationHandler: TaskHandler = {
       task: parsed.task,
       ...(ctx.profile ? { permissions: new Set(ctx.profile.permissions), ceilings: ctx.profile.limits } : {}),
       ...(ctx.signal ? { signal: ctx.signal } : {}),
+      onProgress: ctx.report,
     });
     return {
       status: toTaskStatus(result.status, hasVerifiedFailure(result.findings)),

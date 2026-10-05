@@ -11,7 +11,8 @@
     "skills:list": "tsc && node dist/src/skills/cli.js list",
     "skills:validate": "tsc && node dist/src/skills/cli.js validate",
     "skills:sync": "tsc && node dist/src/skills/cli.js sync",
-    "explore": "tsc && node dist/examples/explore.js"
+    "explore": "tsc && node dist/examples/explore.js",
+    "ui": "tsc && node dist/src/ui/main.js"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
