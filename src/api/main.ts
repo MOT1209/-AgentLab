@@ -1,6 +1,7 @@
 import { initializeAgentLab } from "../bootstrap.js";
 import { loadProviderFile } from "../providers/config.js";
 import { ProviderManager } from "../providers/manager.js";
+import { AdbDevice } from "../device/adb-device.js";
 import { AdbDiscovery } from "../runtime/discovery.js";
 import { DeviceManager } from "../runtime/device-manager.js";
 import { createApiServer } from "./server.js";
@@ -20,17 +21,18 @@ async function main(): Promise<void> {
     providers = new ProviderManager();
   }
 
+  const adbPath = process.env.ADB_PATH ?? "adb";
   const devices = new DeviceManager();
   try {
-    const result = await devices.discover(new AdbDiscovery());
+    const result = await devices.discover(new AdbDiscovery(adbPath), (d) => new AdbDevice(d.serial, adbPath));
     console.log(`[api] adb discovery: ${result.added.length} added, ${result.skipped.length} skipped`);
   } catch (e) {
-    console.warn(`[api] adb discovery failed (adb not found or no devices): ${e instanceof Error ? e.message : String(e)}`);
+    console.warn(`[api] adb discovery failed (using "${adbPath}"): ${e instanceof Error ? e.message : String(e)}`);
   }
 
   const runtime = initializeAgentLab({ deviceManager: devices, providers });
   const port = Number(process.env.PORT ?? 4000);
-  createApiServer(runtime, { webRoot: process.env.WEB_ROOT ?? "web" }).listen(port, () => {
+  createApiServer(runtime, { webRoot: process.env.WEB_ROOT ?? "web", adbPath }).listen(port, () => {
     console.log(`[api] listening on http://localhost:${port}`);
   });
 }

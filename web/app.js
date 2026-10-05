@@ -59,10 +59,16 @@ async function renderDevices(root) {
     out.replaceChildren();
     const r = await api("POST", "/devices/discover", {});
     if (!r.ok) {
-      const missing = /ENOENT|not found/i.test(String(r.data.error));
-      out.append(msg("err", missing ? t().adbMissing : `${t().error}: ${r.data.error}`));
+      const raw = String(r.data.error ?? r.status);
+      out.append(msg("err", /ENOENT/.test(raw) ? t().adbMissing : `${t().error}`), el("div", { class: "help", dir: "ltr" }, `${t().rawError}: ${raw}`));
     } else {
       out.append(msg("ok", t().discovered(r.data.added.length, r.data.skipped.length)));
+      if (r.data.skipped.length > 0) {
+        const hint = (d) => (d.state === "unauthorized" ? t().hintUnauthorized : d.state === "offline" ? t().hintOffline : d.state === "device" ? t().hintKnown : t().hintOther);
+        out.append(
+          el("div", { class: "msg warn" }, el("strong", {}, t().skippedTitle), el("ul", {}, r.data.skipped.map((d) => el("li", {}, el("bdi", {}, `${d.serial}${d.model ? ` (${d.model})` : ""}`), ` — ${d.state}: ${hint(d)}`)))),
+        );
+      }
     }
     await load();
     discover.disabled = false;

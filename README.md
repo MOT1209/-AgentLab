@@ -79,6 +79,25 @@ Other scripts: `npm run typecheck`, `npm run build`.
 
 There is no CLI yet; AgentLab is used as a library (`src/index.ts`).
 
+### Control Center (web UI)
+
+`npm run dev:api`, then open `http://localhost:4000` (Arabic/English toggle). Options are environment
+variables set in the same terminal before starting: `PORT`, `PROVIDERS_FILE`, `ADB_PATH`.
+API keys are never typed into the UI: export the key (for example `GROQ_API_KEY`) first, then add the
+provider and enter only the variable's name.
+
+**Android devices need `adb`.** If the UI says "adb was not found", either add Android platform-tools to PATH
+(Android Studio keeps it in `%LOCALAPPDATA%\Android\Sdk\platform-tools` on Windows) or point to it:
+
+```
+:: Windows CMD                                   # PowerShell
+set ADB_PATH=C:\path\to\platform-tools\adb.exe    $env:ADB_PATH="C:\path\to\platform-tools\adb.exe"
+npm run dev:api
+```
+
+Check `adb devices` in that terminal first. A phone listed as `unauthorized` is waiting for you to accept the
+"Allow USB debugging" prompt on its screen. The API has no authentication: use it on localhost only.
+
 ### 1. Try it with no device and no API key
 
 ```ts

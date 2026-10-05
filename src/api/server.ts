@@ -3,7 +3,8 @@ import { readFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 import type { AgentLabRuntime } from "../bootstrap.js";
 import type { AgentResult, Task } from "../agents/types.js";
-import { AdbDiscovery } from "../runtime/discovery.js";
+import { AdbDevice } from "../device/adb-device.js";
+import { AdbDiscovery, type DeviceDiscovery } from "../runtime/discovery.js";
 import { PROVIDER_PRESETS } from "../providers/presets.js";
 import { ProviderError } from "../providers/types.js";
 import { TaskStore } from "./task-store.js";
@@ -36,7 +37,16 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
  * orchestrator/agents/device internals — every route just calls the library as a consumer
  * would. In-memory only; no persistence (see known-issues.md).
  */
-export function createApiServer(runtime: AgentLabRuntime, opts: { webRoot?: string } = {}): Server {
+export interface ApiOptions {
+  webRoot?: string;
+  /** adb executable to use for discovery and for the devices it finds. Default "adb" (must be on PATH). */
+  adbPath?: string;
+  /** Replaces adb discovery entirely (tests, other device sources). */
+  discovery?: DeviceDiscovery;
+}
+
+export function createApiServer(runtime: AgentLabRuntime, opts: ApiOptions = {}): Server {
+  const adbPath = opts.adbPath ?? "adb";
   const tasks = new TaskStore();
   const webRoot = opts.webRoot ? resolve(opts.webRoot) : undefined;
 
@@ -58,14 +68,39 @@ export function createApiServer(runtime: AgentLabRuntime, opts: { webRoot?: stri
     }
   }
 
+  // Devices found at runtime (Discover) are registered but unassigned, and assignment is otherwise
+  // only done at boot. Give the target MAIN a device here: the requested one, else a free one,
+  // taking it from another MAIN only if that device is not in use (lock FREE).
+  function ensureDevice(agentId: string, requested?: string): string | undefined {
+    const main = runtime.registry.get(agentId);
+    if (!main || main.kind !== "MAIN") return undefined; // dispatch reports bad agents itself
+    const current = runtime.devices.getAssignment(agentId);
+    if (!requested && current) return undefined;
+    const target = requested ?? (runtime.devices.findAvailable() ?? runtime.devices.findAvailable({ includeAssigned: true }))?.id;
+    if (!target) return "no free device is available; connect one and press Discover";
+    if (current?.deviceId === target) return undefined;
+    const snap = runtime.devices.snapshot().find((d) => d.id === target);
+    if (!snap) return `unknown device: ${target}`;
+    try {
+      if (snap.assignedAgentId !== undefined && snap.assignedAgentId !== agentId) runtime.unassignDevice(snap.assignedAgentId);
+      if (current) runtime.reassignDevice(agentId, target);
+      else runtime.assignDevice(agentId, target);
+      return undefined;
+    } catch (e) {
+      return e instanceof Error ? e.message : String(e);
+    }
+  }
+
   async function handleTestsStart(req: IncomingMessage): Promise<JsonResponse> {
-    const body = (await readJsonBody(req)) as { agentId?: unknown; type?: unknown; payload?: unknown };
+    const body = (await readJsonBody(req)) as { agentId?: unknown; type?: unknown; payload?: unknown; deviceId?: unknown };
     if (typeof body.agentId !== "string" || typeof body.type !== "string") {
       return json(400, { error: "agentId and type are required" });
     }
     const agentId = body.agentId;
     const type = body.type;
     const payload = body.payload ?? {};
+    const deviceError = ensureDevice(agentId, typeof body.deviceId === "string" ? body.deviceId : undefined);
+    if (deviceError) return json(409, { error: deviceError });
 
     // dispatch() runs synchronously up to its first await, so by the time the call below
     // returns a pending promise, the TASK_ASSIGNED message (if any) has already been
@@ -120,7 +155,7 @@ export function createApiServer(runtime: AgentLabRuntime, opts: { webRoot?: stri
 
   async function handleDeviceDiscover(): Promise<JsonResponse> {
     try {
-      const result = await runtime.devices.discover(new AdbDiscovery());
+      const result = await runtime.devices.discover(opts.discovery ?? new AdbDiscovery(adbPath), (d) => new AdbDevice(d.serial, adbPath));
       return json(200, result);
     } catch (e) {
       return json(502, { error: e instanceof Error ? e.message : String(e) });

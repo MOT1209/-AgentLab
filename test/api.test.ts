@@ -5,6 +5,9 @@ import type { AddressInfo } from "node:net";
 import { createApiServer } from "../src/api/server.js";
 import { ProviderManager } from "../src/providers/manager.js";
 import { MockProvider } from "../src/providers/mock-provider.js";
+import { initializeAgentLab } from "../src/bootstrap.js";
+import { DeviceManager } from "../src/runtime/device-manager.js";
+import { createMockFleet } from "../src/device/mock-device.js";
 import { lab, smokePayload } from "./helpers.js";
 
 async function withServer<T>(server: Server, run: (base: string) => Promise<T>): Promise<T> {
@@ -162,5 +165,51 @@ test("api: GET /events streams bus messages for a dispatched task", async () => 
     }
     reader.cancel();
     assert.ok(buf.includes("TASK_ASSIGNED"));
+  });
+});
+
+test("api: discover surfaces the raw adb error and honours adbPath", async () => {
+  await withServer(createApiServer(lab(), { adbPath: "/definitely/not/adb" }), async (base) => {
+    const r = await postJson(`${base}/devices/discover`, {});
+    assert.equal(r.status, 502);
+    assert.match((r.body as { error: string }).error, /ENOENT/);
+  });
+});
+
+test("api: discover returns skipped devices with their adb state", async () => {
+  const discovery = {
+    discover: async () => [
+      { serial: "ABC123", state: "device", model: "Pixel_7" },
+      { serial: "XYZ789", state: "unauthorized" },
+    ],
+  };
+  const rt = initializeAgentLab({ deviceManager: new DeviceManager(), assignments: "none" });
+  await withServer(createApiServer(rt, { discovery }), async (base) => {
+    const r = await postJson(`${base}/devices/discover`, {});
+    assert.equal(r.status, 200);
+    const body = r.body as { added: unknown[]; skipped: Array<{ serial: string; state: string }> };
+    assert.equal(body.added.length, 1);
+    assert.deepEqual(body.skipped.map((d) => [d.serial, d.state]), [["XYZ789", "unauthorized"]]);
+  });
+});
+
+test("api: POST /tests assigns a free device to the MAIN, moves it when idle, and 409s when none exist", async () => {
+  const dm = new DeviceManager();
+  const rt = initializeAgentLab({ deviceManager: dm, assignments: "none" });
+  await withServer(createApiServer(rt), async (base) => {
+    const none = await postJson(`${base}/tests`, { agentId: "MAIN-01", type: "smoke", payload: smokePayload });
+    assert.equal(none.status, 409);
+
+    dm.addDevice(createMockFleet(1)[0]!);
+    const first = await postJson(`${base}/tests`, { agentId: "MAIN-01", type: "smoke", payload: smokePayload });
+    assert.equal(first.status, 202);
+    await new Promise((r) => setTimeout(r, 30));
+    let devs = (await getJson(`${base}/devices`)).body as Array<{ assignedAgentId?: string }>;
+    assert.equal(devs[0]!.assignedAgentId, "MAIN-01");
+
+    const second = await postJson(`${base}/tests`, { agentId: "MAIN-03", type: "smoke", payload: smokePayload });
+    assert.equal(second.status, 202);
+    devs = (await getJson(`${base}/devices`)).body as Array<{ assignedAgentId?: string }>;
+    assert.equal(devs[0]!.assignedAgentId, "MAIN-03");
   });
 });

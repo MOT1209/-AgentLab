@@ -1,5 +1,14 @@
 # CURRENT PHASE
 
+Phase 5, Step 3.1 — adb hotfix after the user's Windows report ("adb not found" with a phone on USB):
+ADB_PATH env var (and createApiServer { adbPath, discovery } options) now reach AdbDiscovery and the
+AdbDevice instances it creates; the UI shows the raw error and lists skipped devices with their adb state
+and a hint (unauthorized/offline). POST /tests now gives the target MAIN a device when it has none (optional
+body.deviceId; else a free one; takes it from another MAIN only if its lock is FREE; 409 if none) because
+devices found via Discover were previously never assigned and a test would have been BLOCKED. 112 tests pass.
+Root cause of the user's screenshot is NOT confirmed (most likely adb not on PATH); waiting for `adb version`
+/ `adb devices` output from their terminal.
+
 Phase 5, Step 3 — Control Center UI done (web/: index.html, app.js, i18n.js, style.css; plain
 HTML/CSS/vanilla JS, no build step, bilingual AR/EN with RTL toggle). Served by the API server
 itself (createApiServer(runtime, { webRoot })); `npm run dev:api` then open http://localhost:4000.
