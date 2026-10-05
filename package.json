@@ -7,7 +7,10 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc",
     "test": "tsc && node --test \"dist/test/*.test.js\"",
-    "dev:api": "tsc && node dist/src/api/main.js"
+    "dev:api": "tsc && node dist/src/api/main.js",
+    "skills:list": "tsc && node dist/src/skills/cli.js list",
+    "skills:validate": "tsc && node dist/src/skills/cli.js validate",
+    "skills:sync": "tsc && node dist/src/skills/cli.js sync"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
