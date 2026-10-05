@@ -9,6 +9,7 @@ export interface SmokePayload {
 /** Install, launch, capture evidence, check logs for crashes, stop. */
 export const smokeHandler: TaskHandler = {
   requires: ["install_app", "launch_app", "stop_app", "screenshot", "logs"],
+  permissions: ["APP_INSTALL", "APP_LAUNCH", "SCREENSHOT", "LOG_READ"],
   async handle({ task, device }) {
     const { apkPath, packageName } = task.payload as SmokePayload;
     await device.install(apkPath);

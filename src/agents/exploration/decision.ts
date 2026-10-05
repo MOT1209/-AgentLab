@@ -9,7 +9,8 @@ export type DecisionOutcome =
   | { ok: true; decision: AgentDecision }
   | { ok: false; kind: "INVALID_OUTPUT"; errors: string[] }
   | { ok: false; kind: "PROVIDER_ERROR"; message: string }
-  | { ok: false; kind: "ABORTED" };
+  | { ok: false; kind: "ABORTED" }
+  | { ok: false; kind: "BUDGET"; message: string };
 
 const MAX_DECISION_TOKENS = 1024;
 
@@ -23,13 +24,24 @@ export async function requestDecision(opts: {
   limits: ValidationLimits;
   signal: AbortSignal;
   telemetry: ExplorationTelemetry;
+  /**
+   * Ceilings checked before EVERY model call, including the correction retry. Tokens are only known
+   * after a call returns, so the last call before the ceiling can overshoot it.
+   */
+  budget?: { maxLLMCalls?: number; maxTokens?: number };
 }): Promise<DecisionOutcome> {
-  const { llm, limits, signal, telemetry } = opts;
+  const { llm, limits, signal, telemetry, budget } = opts;
   const messages: { role: "user" | "assistant"; content: string }[] = [{ role: "user", content: opts.userMessage }];
   let lastErrors: string[] = [];
 
   for (let attempt = 0; attempt < 2; attempt++) {
     if (signal.aborted) return { ok: false, kind: "ABORTED" };
+    if (budget?.maxLLMCalls !== undefined && telemetry.llmCalls >= budget.maxLLMCalls) {
+      return { ok: false, kind: "BUDGET", message: `LLM call limit of ${budget.maxLLMCalls} reached.` };
+    }
+    if (budget?.maxTokens !== undefined && telemetry.inputTokens + telemetry.outputTokens >= budget.maxTokens) {
+      return { ok: false, kind: "BUDGET", message: `Token limit of ${budget.maxTokens} reached (${telemetry.inputTokens + telemetry.outputTokens} used).` };
+    }
     let res: LlmResponse;
     telemetry.llmCalls++;
     try {

@@ -14,7 +14,14 @@ import { ACTION_PERMISSION, actionAllowed, type Permission } from "../src/skills
 import { ACTION_NAMES } from "../src/agents/exploration/actions.js";
 import { CANONICAL_DEFINITIONS } from "../src/agents/organization.js";
 import { SKILL_CATALOG } from "../src/skills/catalog.js";
-import { ProfileSet, buildProfiles, createDefaultSkillSystem, validateProfiles } from "../src/skills/profiles.js";
+import { ProfileSet, buildProfiles, createDefaultSkillSystem, validateProfiles, type SkillSystem } from "../src/skills/profiles.js";
+import { initializeAgentLab } from "../src/bootstrap.js";
+import { createMockFleet } from "../src/device/mock-device.js";
+import { MockProvider } from "../src/providers/mock-provider.js";
+import { ProviderManager } from "../src/providers/manager.js";
+import type { AgentResult } from "../src/agents/types.js";
+import type { ExplorationResult } from "../src/agents/exploration/result.js";
+import { lab, smokePayload } from "./helpers.js";
 
 function skill(over: Partial<SkillDefinition> = {}): SkillDefinition {
   return {
@@ -473,4 +480,134 @@ test("cli: validate exits non-zero on problems and zero after sync; list and syn
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+// ---- runtime enforcement ---------------------------------------------------------------------------
+
+function withProfile(id: string, over: Partial<AgentProfile>): SkillSystem {
+  const m = new Map(system.profiles.list().map((p) => [p.agentId, p]));
+  m.set(id, { ...m.get(id)!, ...over });
+  const profiles = new ProfileSet(m);
+  return { registry: system.registry, profiles, resolver: new SkillResolver(system.registry, profiles) };
+}
+const childOf = (t: { result?: unknown }) => (t.result as AgentResult).children![0]!;
+const explorationOf = (t: { result?: unknown }) => childOf(t).details as ExplorationResult;
+const PKG = "com.example.app";
+const explorePayload = { objective: "Explore the application", app: { packageName: PKG }, maxSteps: 50 };
+
+function explorer(llm: MockProvider, skills?: SkillSystem | boolean) {
+  const providers = new ProviderManager();
+  providers.register(llm);
+  const rt = lab({ providers, ...(skills !== undefined ? { skills } : {}) });
+  return rt;
+}
+const wait = { json: { action: "WAIT", ms: 100, reason: "wait" } };
+
+test("enforcement: on by default for the canonical organization, off for custom definitions or skills:false", () => {
+  assert.ok(initializeAgentLab({ devices: createMockFleet(12) }).skills);
+  assert.equal(initializeAgentLab({ devices: createMockFleet(12), skills: false }).skills, undefined);
+  assert.equal(initializeAgentLab({ devices: createMockFleet(12), definitions: CANONICAL_DEFINITIONS }).skills, undefined);
+});
+
+test("enforcement: a handler needing a permission the profile lacks is BLOCKED and touches no device", async () => {
+  const rt = lab({ skills: withProfile("MAIN-01-B", { permissions: ["APP_LAUNCH", "SCREENSHOT", "LOG_READ"] }) });
+  const t = await rt.orchestrator.dispatch("MAIN-01", "smoke", smokePayload);
+  assert.equal(t.status, "BLOCKED");
+  assert.match(childOf(t).summary, /MAIN-01-B: permission denied: APP_INSTALL/);
+  assert.deepEqual(rt.fleet[0]!.trace, []);
+  assert.equal(rt.devices.describe("DEVICE-01")!.lock, "FREE");
+});
+
+test("enforcement: smoke still passes with its normal profile, and with enforcement off", async () => {
+  for (const skills of [undefined, false] as const) {
+    const rt = lab(skills === undefined ? {} : { skills });
+    assert.equal((await rt.orchestrator.dispatch("MAIN-01", "smoke", smokePayload)).status, "PASSED");
+  }
+});
+
+test("enforcement: no profile at all fails closed for governed handlers; ungoverned handlers are unaffected", async () => {
+  const empty: SkillSystem = { registry: system.registry, profiles: new ProfileSet(new Map()), resolver: new SkillResolver(system.registry, new ProfileSet(new Map())) };
+  const ungoverned = { requires: [], handle: async () => ({ status: "PASSED" as const, summary: "ran", evidence: [] }) };
+  const rt = lab({ skills: empty, behaviors: { "MAIN-03-A": { ask: ungoverned } } });
+  const smoke = await rt.orchestrator.dispatch("MAIN-01", "smoke", smokePayload);
+  assert.equal(smoke.status, "BLOCKED");
+  assert.match(childOf(smoke).summary, /permission denied: no skill profile/);
+  const ask = await rt.orchestrator.dispatch("MAIN-03", "ask", {});
+  assert.equal(ask.status, "PASSED");
+});
+
+test("enforcement: a device source the profile does not allow is BLOCKED", async () => {
+  const rt = lab({ skills: withProfile("MAIN-01-B", { deviceSources: ["PHYSICAL"] }) });
+  const t = await rt.orchestrator.dispatch("MAIN-01", "smoke", smokePayload);
+  assert.equal(t.status, "BLOCKED");
+  assert.match(childOf(t).summary, /device source MOCK is not allowed for this agent/);
+  assert.deepEqual(rt.fleet[0]!.trace, []);
+});
+
+test("enforcement: handlers receive their profile when enforcement is on, and none when it is off", async () => {
+  const probe = { requires: [], permissions: ["SCREENSHOT" as const], handle: async ({ profile }: { profile?: AgentProfile }) => ({ status: "PASSED" as const, summary: profile?.agentId ?? "none", evidence: [] }) };
+  const on = lab({ behaviors: { "MAIN-05-B": { probe } } });
+  assert.equal(childOf(await on.orchestrator.dispatch("MAIN-05", "probe", {})).summary, "MAIN-05-B");
+  const off = lab({ skills: false, behaviors: { "MAIN-05-B": { probe } } });
+  assert.equal(childOf(await off.orchestrator.dispatch("MAIN-05", "probe", {})).summary, "none");
+});
+
+test("exploration: an action the profile does not permit never reaches the device", async () => {
+  const noInteract = withProfile("MAIN-05-A", { permissions: ["UI_READ", "SCREENSHOT", "LOG_READ", "APP_LAUNCH"] });
+  const llm = MockProvider.scripted([{ json: { action: "TAP", target: { x: 10, y: 10 }, reason: "tap" } }]);
+  const rt = explorer(llm, noInteract);
+  const t = await rt.orchestrator.dispatch("MAIN-05", "explore", explorePayload);
+  const d = explorationOf(t);
+  assert.equal(d.status, "ERROR");
+  assert.match(d.summary, /no valid action/);
+  assert.ok(!rt.fleet[4]!.trace.some((x) => x.startsWith("tap")));
+  assert.equal(d.telemetry.actions, 0);
+
+  const ok = explorer(MockProvider.scripted([{ json: { action: "TAP", target: { x: 10, y: 10 }, reason: "tap" } }, { json: { action: "END_TEST", reason: "done" } }]));
+  await ok.orchestrator.dispatch("MAIN-05", "explore", explorePayload);
+  assert.ok(ok.fleet[4]!.trace.some((x) => x.startsWith("tap")), "with its normal profile the same action does run");
+});
+
+test("exploration: the profile's maxSteps is a ceiling over the task's maxSteps", async () => {
+  const rt = explorer(MockProvider.scripted([wait]), withProfile("MAIN-05-A", { limits: { ...LIMITS, maxSteps: 2 } }));
+  const d = explorationOf(await rt.orchestrator.dispatch("MAIN-05", "explore", explorePayload));
+  assert.equal(d.status, "MAX_STEPS_REACHED");
+  assert.equal(d.steps, 2);
+});
+
+test("exploration: maxLLMCalls stops the run before the next model call and maps to BLOCKED", async () => {
+  const llm = MockProvider.scripted([wait]);
+  const rt = explorer(llm, withProfile("MAIN-05-A", { limits: { ...LIMITS, maxLLMCalls: 2 } }));
+  const t = await rt.orchestrator.dispatch("MAIN-05", "explore", explorePayload);
+  const d = explorationOf(t);
+  assert.equal(d.status, "BUDGET_EXHAUSTED");
+  assert.match(d.summary, /LLM call limit of 2 reached/);
+  assert.equal(d.telemetry.llmCalls, 2);
+  assert.equal(llm.requests.length, 2);
+  assert.equal(t.status, "BLOCKED");
+});
+
+test("exploration: maxTokens stops the run once the budget is spent (one call can overshoot)", async () => {
+  const llm = MockProvider.scripted([wait]);
+  const rt = explorer(llm, withProfile("MAIN-05-A", { limits: { ...LIMITS, maxTokens: 20 } }));
+  const d = explorationOf(await rt.orchestrator.dispatch("MAIN-05", "explore", explorePayload));
+  assert.equal(d.status, "BUDGET_EXHAUSTED");
+  assert.match(d.summary, /Token limit of 20 reached \(30 used\)/);
+  assert.equal(d.telemetry.llmCalls, 2);
+});
+
+test("exploration: the correction retry also counts against maxLLMCalls", async () => {
+  const llm = MockProvider.scripted(["this is not json"]);
+  const rt = explorer(llm, withProfile("MAIN-05-A", { limits: { ...LIMITS, maxLLMCalls: 1 } }));
+  const d = explorationOf(await rt.orchestrator.dispatch("MAIN-05", "explore", explorePayload));
+  assert.equal(d.status, "BUDGET_EXHAUSTED");
+  assert.equal(d.telemetry.llmCalls, 1);
+  assert.equal(llm.requests.length, 1);
+});
+
+test("exploration: with the default profile, existing behaviour is unchanged (ceilings are not hit)", async () => {
+  const rt = explorer(MockProvider.scripted([{ json: { action: "LAUNCH_APP", reason: "start" } }, { json: { action: "END_TEST", reason: "done" } }]));
+  const t = await rt.orchestrator.dispatch("MAIN-05", "explore", explorePayload);
+  assert.equal(t.status, "PASSED");
+  assert.equal(explorationOf(t).status, "PASSED");
 });

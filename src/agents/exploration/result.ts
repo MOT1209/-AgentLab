@@ -1,7 +1,7 @@
 import type { Evidence, TaskStatus } from "../types.js";
 import type { Finding } from "./findings.js";
 
-export type ExplorationStatus = "PASSED" | "FAILED" | "BLOCKED" | "CANCELLED" | "TIMEOUT" | "MAX_STEPS_REACHED" | "ERROR";
+export type ExplorationStatus = "PASSED" | "FAILED" | "BLOCKED" | "CANCELLED" | "TIMEOUT" | "MAX_STEPS_REACHED" | "BUDGET_EXHAUSTED" | "ERROR";
 
 export interface ExplorationTelemetry {
   llmCalls: number;
@@ -52,6 +52,7 @@ export function toTaskStatus(status: ExplorationStatus, verifiedFailure: boolean
       return "FAILED";
     case "BLOCKED":
     case "TIMEOUT":
+    case "BUDGET_EXHAUSTED":
       return "BLOCKED";
     case "CANCELLED":
       return "SKIPPED";

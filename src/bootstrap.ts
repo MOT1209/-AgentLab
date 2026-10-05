@@ -12,6 +12,7 @@ import { DeviceManager } from "./runtime/device-manager.js";
 import type { RegisterOptions } from "./runtime/device-registry.js";
 import type { ProviderManager } from "./providers/manager.js";
 import type { AgentAssignment } from "./runtime/types.js";
+import { createDefaultSkillSystem, type SkillSystem } from "./skills/profiles.js";
 
 /** A bare Device, or a Device with registration details. */
 export type DeviceInput = Device | ({ device: Device } & RegisterOptions);
@@ -32,6 +33,12 @@ export interface AgentLabOptions {
   behaviors?: BehaviorTable;
   /** Custom organization. Skips the 12/24 check, which applies to the default configuration only. */
   definitions?: readonly AgentDefinition[];
+  /**
+   * Skill profiles that gate handlers declaring `permissions` (and bound exploration limits).
+   * Default: the built-in system for the canonical organization, and none for custom `definitions`.
+   * `false` turns enforcement off; a SkillSystem supplies your own.
+   */
+  skills?: boolean | SkillSystem;
 }
 
 export interface AgentLabRuntime {
@@ -41,6 +48,8 @@ export interface AgentLabRuntime {
   orchestrator: Orchestrator;
   devices: DeviceManager;
   providers?: ProviderManager;
+  /** Present when skill enforcement is on. */
+  skills?: SkillSystem;
   agents: ManagedAgent[];
   /** Assign a device to a MAIN agent (sub-agents inherit it). */
   assignDevice(mainId: string, deviceId: string): AgentAssignment;
@@ -74,7 +83,15 @@ export function initializeAgentLab(opts: AgentLabOptions): AgentLabRuntime {
   const bus = new MessageBus();
   const ids = new Set(defs.map((d) => d.id));
   const defaults = Object.fromEntries(Object.entries(DEFAULT_BEHAVIORS).filter(([id]) => ids.has(id)));
-  const factory = new AgentFactory({ devices, ...(opts.providers ? { providers: opts.providers } : {}), registry, bus, behaviors: { ...defaults, ...opts.behaviors } });
+  const skills = opts.skills === false ? undefined : typeof opts.skills === "object" ? opts.skills : opts.definitions ? undefined : createDefaultSkillSystem();
+  const factory = new AgentFactory({
+    devices,
+    ...(opts.providers ? { providers: opts.providers } : {}),
+    ...(skills ? { profiles: skills.profiles } : {}),
+    registry,
+    bus,
+    behaviors: { ...defaults, ...opts.behaviors },
+  });
   const agents = factory.createOrganization(defs);
 
   const problems = registry.validateRelationships();
@@ -92,6 +109,7 @@ export function initializeAgentLab(opts: AgentLabOptions): AgentLabRuntime {
     orchestrator: new Orchestrator(registry, bus),
     devices,
     ...(opts.providers ? { providers: opts.providers } : {}),
+    ...(skills ? { skills } : {}),
     agents,
     assignDevice(mainId, deviceId) {
       requireMain(mainId);

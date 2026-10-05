@@ -1,5 +1,6 @@
 import type { ProviderManager } from "../providers/manager.js";
 import type { DeviceManager } from "../runtime/device-manager.js";
+import type { ProfileSource } from "../skills/resolver.js";
 import { AgentDefinition, AgentValidationError } from "./definitions.js";
 import { MainAgent } from "./main-agent.js";
 import { AgentDeps, HandlerMap, ManagedAgent } from "./managed-agent.js";
@@ -15,6 +16,7 @@ export type BehaviorTable = Readonly<Record<string, HandlerMap>>;
 export interface FactoryOptions {
   devices: DeviceManager;
   providers?: ProviderManager;
+  profiles?: ProfileSource;
   registry: AgentRegistry;
   bus?: MessageBus;
   behaviors?: BehaviorTable;
@@ -25,7 +27,7 @@ export class AgentFactory {
   private readonly behaviors: BehaviorTable;
 
   constructor(opts: FactoryOptions) {
-    this.deps = { devices: opts.devices, ...(opts.providers ? { providers: opts.providers } : {}), registry: opts.registry, bus: opts.bus ?? new MessageBus() };
+    this.deps = { devices: opts.devices, ...(opts.providers ? { providers: opts.providers } : {}), ...(opts.profiles ? { profiles: opts.profiles } : {}), registry: opts.registry, bus: opts.bus ?? new MessageBus() };
     this.behaviors = opts.behaviors ?? {};
   }
 

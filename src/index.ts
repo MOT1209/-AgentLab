@@ -6,3 +6,4 @@ export * from "./orchestrator.js";
 export * from "./device/types.js";
 export { MockDevice, createMockFleet } from "./device/mock-device.js";
 export { AdbDevice } from "./device/adb-device.js";
+export * from "./skills/index.js";

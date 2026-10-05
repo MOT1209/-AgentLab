@@ -28,6 +28,12 @@ export class SubAgent extends ManagedAgent {
     if (missing.length > 0) {
       return { status: "BLOCKED", summary: `${this.id} lacks capabilities: ${missing.join(", ")}`, evidence: [] };
     }
+    const profile = this.deps.profiles?.get(this.id);
+    if (this.deps.profiles && handler.permissions) {
+      if (!profile) return { status: "BLOCKED", summary: `${this.id}: permission denied: no skill profile`, evidence: [] };
+      const denied = handler.permissions.filter((p) => !profile.permissions.includes(p));
+      if (denied.length > 0) return { status: "BLOCKED", summary: `${this.id}: permission denied: ${denied.join(", ")}`, evidence: [] };
+    }
     const runtime = this.runtimeContext();
     if (!runtime) {
       return { status: "BLOCKED", summary: `${this.id}: no active device lease for ${this.rootMainId}`, evidence: [] };
@@ -38,9 +44,15 @@ export class SubAgent extends ManagedAgent {
     }
     const device = this.deps.devices.getDevice(runtime.deviceId);
     if (!device) return { status: "BLOCKED", summary: `device ${runtime.deviceId} is no longer registered`, evidence: [] };
+    if (profile && handler.permissions) {
+      const source = this.deps.devices.registry.get(runtime.deviceId)?.source;
+      if (source && !profile.deviceSources.includes(source)) {
+        return { status: "BLOCKED", summary: `${this.id}: permission denied: device source ${source} is not allowed for this agent`, evidence: [] };
+      }
+    }
     try {
       const llm = this.deps.providers?.forAgent(this.id, this.rootMainId);
-      return await handler.handle({ task, device, runtime, definition: this.definition, ...(llm ? { llm } : {}), ...(opts.signal ? { signal: opts.signal } : {}) });
+      return await handler.handle({ task, device, runtime, definition: this.definition, ...(profile ? { profile } : {}), ...(llm ? { llm } : {}), ...(opts.signal ? { signal: opts.signal } : {}) });
     } catch (e) {
       // An unavailable device is an environment problem, not an agent fault.
       if (e instanceof DeviceError) return { status: "BLOCKED", summary: e.message, evidence: [] };

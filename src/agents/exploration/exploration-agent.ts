@@ -1,5 +1,7 @@
 import type { Device } from "../../device/types.js";
 import type { LlmProvider } from "../../providers/types.js";
+import { actionAllowed, type Permission } from "../../skills/permissions.js";
+import type { AgentLimits } from "../../skills/types.js";
 import type { HandlerContext, TaskHandler } from "../managed-agent.js";
 import type { AgentResult } from "../types.js";
 import { ActionExecutor, ActionOutcome } from "./action-executor.js";
@@ -27,10 +29,20 @@ export interface ExplorationDeps {
   device: Device;
   llm: LlmProvider;
   task: ExplorationTask;
+  /** When set, only actions these permissions cover can run; END_TEST and WAIT need none. */
+  permissions?: ReadonlySet<Permission>;
+  /** Ceilings from the agent's skill profile. The effective limit is the smaller of task and ceiling. */
+  ceilings?: AgentLimits;
   signal?: AbortSignal;
   now?: () => number;
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
   log?: Logger;
+}
+
+/** The smaller of what the task asked for and what the agent's profile allows. */
+function clampTask(task: ExplorationTask, ceilings?: AgentLimits): ExplorationTask {
+  if (!ceilings) return task;
+  return { ...task, maxSteps: Math.min(task.maxSteps, ceilings.maxSteps), timeoutMs: Math.min(task.timeoutMs, ceilings.maxExecutionTimeMs) };
 }
 
 const REPEAT_WARN_AT = 3;
@@ -41,7 +53,8 @@ const REPEAT_STOP_AT = 5;
  * Never throws; every exit path (limit, timeout, cancel, error, device loss) yields a structured result.
  */
 export async function runExploration(deps: ExplorationDeps): Promise<ExplorationResult> {
-  const { device, llm, task, taskId, agentId } = deps;
+  const { device, llm, taskId, agentId } = deps;
+  const task = clampTask(deps.task, deps.ceilings);
   const now = deps.now ?? Date.now;
   const log = deps.log ?? envLogger;
   const startMs = now();
@@ -51,7 +64,8 @@ export async function runExploration(deps: ExplorationDeps): Promise<Exploration
   const findings = new FindingLog(agentId, now);
   const packageName = task.app?.packageName;
   const executor = new ActionExecutor(device, { evidence, ...(packageName ? { packageName } : {}), ...(deps.sleep ? { sleep: deps.sleep } : {}) });
-  const supported = supportedActions(device, !!packageName);
+  const deviceActions = supportedActions(device, !!packageName);
+  const supported = deps.permissions ? new Set([...deviceActions].filter((a) => actionAllowed(a, deps.permissions!))) : deviceActions;
   const limits: ValidationLimits = { supported, ...(task.screen ? { screen: task.screen } : {}) };
   const history: ActionRecord[] = [];
   const tel: ExplorationTelemetry = { llmCalls: 0, actions: 0, actionFailures: 0, providerErrors: 0, deviceErrors: 0, malformedResponses: 0, inputTokens: 0, outputTokens: 0, durationMs: 0 };
@@ -184,9 +198,11 @@ export async function runExploration(deps: ExplorationDeps): Promise<Exploration
         available: [...supported],
         ...(warning ? { warning } : {}),
       });
-      const out = await requestDecision({ llm, userMessage: message, limits, signal: ctrl.signal, telemetry: tel });
+      const budget = deps.ceilings ? { maxLLMCalls: deps.ceilings.maxLLMCalls, maxTokens: deps.ceilings.maxTokens } : undefined;
+      const out = await requestDecision({ llm, userMessage: message, limits, signal: ctrl.signal, telemetry: tel, ...(budget ? { budget } : {}) });
       if (!out.ok) {
         if (out.kind === "ABORTED") return aborted();
+        if (out.kind === "BUDGET") return finish("BUDGET_EXHAUSTED", out.message);
         if (out.kind === "PROVIDER_ERROR") return finish("ERROR", `LLM provider failed: ${out.message}`);
         return finish("ERROR", `The model returned no valid action after one correction attempt (${out.errors.join("; ")}).`);
       }
@@ -237,6 +253,7 @@ export async function runExploration(deps: ExplorationDeps): Promise<Exploration
 /** Task handler for MAIN-05-A. The only inputs are the validated task payload, ctx.llm and the leased device. */
 export const explorationHandler: TaskHandler = {
   requires: ["launch_app", "stop_app", "tap", "type", "swipe", "press_key", "screenshot", "inspect_ui", "logs"],
+  permissions: ["UI_READ", "APP_LAUNCH"],
   async handle(ctx: HandlerContext): Promise<AgentResult> {
     if (!ctx.llm) {
       return { status: "BLOCKED", summary: `${ctx.definition.id}: no LLM provider configured for this agent`, evidence: [] };
@@ -252,6 +269,7 @@ export const explorationHandler: TaskHandler = {
       device: ctx.device,
       llm: ctx.llm,
       task: parsed.task,
+      ...(ctx.profile ? { permissions: new Set(ctx.profile.permissions), ceilings: ctx.profile.limits } : {}),
       ...(ctx.signal ? { signal: ctx.signal } : {}),
     });
     return {

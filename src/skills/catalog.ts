@@ -165,7 +165,7 @@ Mapping to a goal loop: understand = objective in the prompt; plan = the model's
 ## Safety
 - \`validateDecision\` is the only path from model output to an action. Allowed actions: ${ACTION_NAMES.join(", ")}. There is no shell, ADB, file or network action, and no action takes a package name.
 - The effective action set is narrowed to what the agent's profile permits; a denied action is rejected before it runs.
-- Limits: maxSteps, timeout, cancellation, repeated-action stop, and the profile's LLM-call and token ceilings.
+- Limits: maxSteps, timeout, cancellation, repeated-action stop, and the profile's ceilings (maxSteps, maxExecutionTimeMs, maxLLMCalls, maxTokens), each the smaller of the task's and the profile's value. LLM-call and token ceilings are checked before every model call, including the correction retry; tokens are known only after a call, so one call can overshoot the token ceiling. Hitting one ends the run as BUDGET_EXHAUSTED, which the platform reports as BLOCKED.
 
 ## AgentLab-specific rules
 The model is blind to pixels; games, WebViews and canvases expose little UI hierarchy, so exploration there is weak. AI observations never fail a task; only VERIFIED findings do.`,

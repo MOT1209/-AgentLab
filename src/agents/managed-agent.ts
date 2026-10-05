@@ -1,3 +1,6 @@
+import type { Permission } from "../skills/permissions.js";
+import type { ProfileSource } from "../skills/resolver.js";
+import type { AgentProfile } from "../skills/types.js";
 import type { Device } from "../device/types.js";
 import type { DeviceManager } from "../runtime/device-manager.js";
 import type { ProviderManager } from "../providers/manager.js";
@@ -12,6 +15,8 @@ import type { AgentResult, Task } from "./types.js";
 
 export interface AgentDeps {
   devices: DeviceManager;
+  /** Optional. When set, handlers that declare `permissions` are gated by the agent's skill profile. */
+  profiles?: ProfileSource;
   /** Optional. Without it, handlers get no `llm` and must work deterministically. */
   providers?: ProviderManager;
   registry: AgentRegistry;
@@ -28,12 +33,19 @@ export interface HandlerContext {
   /** The LLM provider routed to this agent (its own override, its MAIN's, or the default). */
   llm?: LlmProvider;
   definition: AgentDefinition;
+  /** The agent's skill profile, present when skill enforcement is on. */
+  profile?: AgentProfile;
 }
 
 /** Configurable unit of work a SUB agent can perform for one task type. */
 export interface TaskHandler {
   /** Capabilities the executing agent must declare. */
   readonly requires: readonly Capability[];
+  /**
+   * Permissions the agent must hold to run this handler at all. Checked against its skill profile when
+   * enforcement is on; a handler that declares none is not governed (and not blocked) by profiles.
+   */
+  readonly permissions?: readonly Permission[];
   handle(ctx: HandlerContext): Promise<AgentResult>;
 }
 
