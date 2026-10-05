@@ -77,9 +77,18 @@ npm test          # typecheck + build + 98 tests, fully offline
 
 Other scripts: `npm run typecheck`, `npm run build`.
 
-There is no CLI yet; AgentLab is used as a library (`src/index.ts`).
+There is no full CLI yet; AgentLab is a library (`src/index.ts`) plus one runnable example, `examples/explore.ts`:
+
+```bash
+npm run explore -- --mock                      # offline demo, nothing needed
+npm run explore -- --package com.example.app   # real device + ANTHROPIC_API_KEY
+```
+
+It writes `out/<task-id>/report.json` and the screenshots as PNG files.
 
 ### 1. Try it with no device and no API key
+
+Quickest: `npm run explore -- --mock`. Or from code:
 
 ```ts
 import { initializeAgentLab, createMockFleet, ProviderManager, MockProvider } from "./src/index.js";
@@ -105,6 +114,8 @@ console.log(task.status, task.result);
 `createMockFleet(12)` creates `DEVICE-01` … `DEVICE-12`, auto-assigned to `MAIN-01` … `MAIN-12`.
 
 ### 2. Run it for real (untested path: expect to debug)
+
+Quickest: steps 1-2, then `npm run explore -- --package <your.app.package>`. Or from code:
 
 1. Start an emulator or connect a device with USB debugging, and check `adb devices -l`.
 2. Put your key in the environment (never in a file or in chat):
@@ -209,6 +220,7 @@ src/
   providers/         Anthropic, OpenAI-compatible, Mock, manager, config
   bootstrap.ts       initializeAgentLab()
   orchestrator.ts    dispatch (with cancellation)
+examples/            runnable example (explore.ts)
 test/                98 offline tests
 .claude/
   skills/ai-testing-lab/   project skill: architecture, agents, android, providers, exploration notes
