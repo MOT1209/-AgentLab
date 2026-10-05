@@ -20,3 +20,6 @@
 - No cost cap: maxSteps/timeout bound a run, but tokens/cost are only reported in telemetry — MEDIUM — open
 - No back-off between LLM calls and no concurrency limit across the 12 MAIN agents (rate limits untested) — LOW — open
 - uiautomator dump can fail while an animation runs or on secure screens (FLAG_SECURE); the agent then sees "ui: unavailable" — LOW — open
+- src/api/ has no auth/authz: any caller that can reach the port can dispatch tests, read provider status, and stream the full message bus. Fine for local dev only — MEDIUM — open
+- No request body size limit on POST routes (readJsonBody buffers the whole body) — LOW — open
+- GET /events has no reconnection/backlog support: a client that connects after a run started misses earlier messages (bus.history() exists but isn't replayed on connect) — LOW — open

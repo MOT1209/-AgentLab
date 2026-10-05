@@ -1,11 +1,19 @@
 # CURRENT PHASE
 
+Phase 5, Step 2 — Backend/API layer done (src/api/): server.ts (plain node:http, no framework),
+task-store.ts, main.ts (dev entry, `npm run dev:api`). Routes: GET /providers, POST
+/providers/:id/test, GET /devices, POST /devices/discover, POST /tests (returns 202 + taskId
+without blocking on the run), GET /tests/:taskId, GET /events (SSE of the MessageBus). No new
+runtime dependency. 106 tests pass (6 new in test/api.test.ts), typecheck + build clean.
+Manually verified with `npm run dev:api` + curl in this sandbox (no adb present here, confirming
+the existing known-issue; routes behave correctly with zero providers/devices).
+Next: Phase 5 Step 3 — Frontend Control Center wired to this API.
+
 Phase 5, Step 1 — provider presets added (src/providers/presets.ts): openai, groq, openrouter,
 together, fireworks, ollama. A config sets `"preset": "<id>"` to fill in `baseUrl` for
 openai-compatible instead of hand-writing it; an explicit baseUrl still wins. 100 tests pass,
-typecheck + build clean. Next: Phase 5 Step 2 — Backend/API layer (see decisions.md).
-"OpenCode/Zen" was requested by the user as a provider but its API shape is unconfirmed — not
-added as a preset yet.
+typecheck + build clean. "OpenCode/Zen" was requested by the user as a provider but its API shape
+is unconfirmed — not added as a preset yet.
 
 Phase 4 — first real LLM-driven agent done: MAIN-05-A Exploration Agent (98 tests pass, typecheck + build clean).
 See knowledge/exploration.md. Earlier: agent framework (P2), device runtime (P3), providers (P3.5).
