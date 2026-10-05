@@ -4,6 +4,7 @@ import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { createApiServer } from "../src/api/server.js";
 import { ProviderManager } from "../src/providers/manager.js";
+import { MockProvider } from "../src/providers/mock-provider.js";
 import { lab, smokePayload } from "./helpers.js";
 
 async function withServer<T>(server: Server, run: (base: string) => Promise<T>): Promise<T> {
@@ -47,6 +48,61 @@ test("api: POST /providers/:id/test makes the real round trip and reports failur
     assert.deepEqual(ok.body, { ok: true, model: "m" });
     const missing = await postJson(`${base}/providers/nope/test`, {});
     assert.equal((missing.body as { ok: boolean }).ok, false);
+  });
+});
+
+test("api: GET /providers/presets lists the presets", async () => {
+  await withServer(createApiServer(lab()), async (base) => {
+    const r = await getJson(`${base}/providers/presets`);
+    assert.equal(r.status, 200);
+    const ids = (r.body as Array<{ id: string }>).map((p) => p.id);
+    assert.ok(ids.includes("groq") && ids.includes("openrouter") && ids.includes("ollama"));
+  });
+});
+
+test("api: POST /providers adds, rejects bad configs with 400, and never accepts a key; DELETE removes", async () => {
+  const providers = new ProviderManager({ get: (n: string) => (n === "GROQ_API_KEY" ? "gsk-test-0123456789" : undefined) }, {
+    anthropic: (c) => new MockProvider(c.id, c.model),
+    "openai-compatible": (c) => new MockProvider(c.id, c.model),
+    mock: (c) => new MockProvider(c.id, c.model),
+  });
+  await withServer(createApiServer(lab({ providers })), async (base) => {
+    const good = { id: "groq-1", kind: "openai-compatible", preset: "groq", model: "llama-3.3-70b-versatile", auth: { type: "api_key", env: "GROQ_API_KEY" } };
+    const added = await postJson(`${base}/providers`, good);
+    assert.equal(added.status, 201);
+
+    const listed = (await getJson(`${base}/providers`)).body as Array<{ id: string; baseUrl?: string }>;
+    assert.equal(listed[0]!.baseUrl, "https://api.groq.com/openai/v1");
+
+    const noEnv = await postJson(`${base}/providers`, { ...good, id: "groq-2", auth: { type: "api_key", env: "NOT_SET_ANYWHERE" } });
+    assert.equal(noEnv.status, 400);
+    assert.match((noEnv.body as { error: string }).error, /not set/);
+
+    const withKey = await postJson(`${base}/providers`, { ...good, id: "groq-3", auth: { type: "api_key", env: "GROQ_API_KEY", key: "gsk-secret" } });
+    assert.equal(withKey.status, 400);
+    assert.ok(!JSON.stringify(withKey.body).includes("gsk-secret"));
+
+    const bad = await fetch(`${base}/providers`, { method: "POST", body: "{nope" });
+    assert.equal(bad.status, 400);
+
+    const removed = await fetch(`${base}/providers/groq-1`, { method: "DELETE" });
+    assert.equal(removed.status, 200);
+    const again = await fetch(`${base}/providers/groq-1`, { method: "DELETE" });
+    assert.equal(again.status, 404);
+  });
+});
+
+test("api: serves the Control Center files and refuses to escape webRoot", async () => {
+  await withServer(createApiServer(lab(), { webRoot: "web" }), async (base) => {
+    const index = await fetch(`${base}/`);
+    assert.equal(index.status, 200);
+    assert.match(index.headers.get("content-type") ?? "", /text\/html/);
+    assert.equal((await fetch(`${base}/app.js`)).status, 200);
+    assert.equal((await fetch(`${base}/..%2Fpackage.json`)).status, 404);
+    assert.equal((await fetch(`${base}/%2e%2e/package.json`)).status, 404);
+  });
+  await withServer(createApiServer(lab()), async (base) => {
+    assert.equal((await fetch(`${base}/`)).status, 404);
   });
 });
 

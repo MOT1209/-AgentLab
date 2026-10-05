@@ -12,11 +12,12 @@ import { createApiServer } from "./server.js";
  */
 async function main(): Promise<void> {
   const providersFile = process.env.PROVIDERS_FILE ?? "providers.example.json";
-  let providers: ProviderManager | undefined;
+  let providers: ProviderManager;
   try {
     providers = ProviderManager.fromFile(loadProviderFile(providersFile));
   } catch (e) {
     console.warn(`[api] no usable provider file at ${providersFile}: ${e instanceof Error ? e.message : String(e)}`);
+    providers = new ProviderManager();
   }
 
   const devices = new DeviceManager();
@@ -27,9 +28,9 @@ async function main(): Promise<void> {
     console.warn(`[api] adb discovery failed (adb not found or no devices): ${e instanceof Error ? e.message : String(e)}`);
   }
 
-  const runtime = initializeAgentLab({ deviceManager: devices, ...(providers ? { providers } : {}) });
+  const runtime = initializeAgentLab({ deviceManager: devices, providers });
   const port = Number(process.env.PORT ?? 4000);
-  createApiServer(runtime).listen(port, () => {
+  createApiServer(runtime, { webRoot: process.env.WEB_ROOT ?? "web" }).listen(port, () => {
     console.log(`[api] listening on http://localhost:${port}`);
   });
 }

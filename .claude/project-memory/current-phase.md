@@ -1,5 +1,16 @@
 # CURRENT PHASE
 
+Phase 5, Step 3 — Control Center UI done (web/: index.html, app.js, i18n.js, style.css; plain
+HTML/CSS/vanilla JS, no build step, bilingual AR/EN with RTL toggle). Served by the API server
+itself (createApiServer(runtime, { webRoot })); `npm run dev:api` then open http://localhost:4000.
+Screens: Devices (real adb discovery), AI providers (preset dropdown, add/test/remove — keys are
+env-var NAMES only, never entered in the UI), Run a test (explore/smoke, live SSE agent activity,
+result card). API gained GET /providers/presets, POST /providers, DELETE /providers/:id; main.ts
+always creates a ProviderManager so providers can be added from the UI. 109 tests pass.
+Verified in headless Chromium against a mock fleet + mock provider (add Groq preset -> test
+connection -> run smoke test -> live events + result; Arabic RTL renders). NOT verified: real adb,
+real device, real LLM provider (Step 4). Next: Phase 5 Step 4 — real-world validation.
+
 Phase 5, Step 2 — Backend/API layer done (src/api/): server.ts (plain node:http, no framework),
 task-store.ts, main.ts (dev entry, `npm run dev:api`). Routes: GET /providers, POST
 /providers/:id/test, GET /devices, POST /devices/discover, POST /tests (returns 202 + taskId

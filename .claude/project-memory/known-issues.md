@@ -21,5 +21,6 @@
 - No back-off between LLM calls and no concurrency limit across the 12 MAIN agents (rate limits untested) — LOW — open
 - uiautomator dump can fail while an animation runs or on secure screens (FLAG_SECURE); the agent then sees "ui: unavailable" — LOW — open
 - src/api/ has no auth/authz: any caller that can reach the port can dispatch tests, read provider status, and stream the full message bus. Fine for local dev only — MEDIUM — open
+- Control Center UI has only been exercised in headless Chromium against mocks; no real device/adb/LLM, no mobile-browser pass, and POST /providers lets any caller who can reach the port register a provider that reads any env var NAME present on the server (including unrelated secrets) — MEDIUM — open (needs auth or an allowlist before any non-local use)
 - No request body size limit on POST routes (readJsonBody buffers the whole body) — LOW — open
 - GET /events has no reconnection/backlog support: a client that connects after a run started misses earlier messages (bus.history() exists but isn't replayed on connect) — LOW — open

@@ -1,13 +1,23 @@
 import { createServer, IncomingMessage, ServerResponse, Server } from "node:http";
+import { readFile } from "node:fs/promises";
+import { extname, resolve, sep } from "node:path";
 import type { AgentLabRuntime } from "../bootstrap.js";
 import type { AgentResult, Task } from "../agents/types.js";
 import { AdbDiscovery } from "../runtime/discovery.js";
+import { PROVIDER_PRESETS } from "../providers/presets.js";
+import { ProviderError } from "../providers/types.js";
 import { TaskStore } from "./task-store.js";
 
 interface JsonResponse {
   status: number;
   body: unknown;
 }
+
+const MIME: Record<string, string> = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+};
 
 function json(status: number, body: unknown): JsonResponse {
   return { status, body };
@@ -26,8 +36,27 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
  * orchestrator/agents/device internals — every route just calls the library as a consumer
  * would. In-memory only; no persistence (see known-issues.md).
  */
-export function createApiServer(runtime: AgentLabRuntime): Server {
+export function createApiServer(runtime: AgentLabRuntime, opts: { webRoot?: string } = {}): Server {
   const tasks = new TaskStore();
+  const webRoot = opts.webRoot ? resolve(opts.webRoot) : undefined;
+
+  // Serves the static Control Center. Anything that resolves outside webRoot is a 404.
+  async function serveStatic(path: string, res: ServerResponse): Promise<boolean> {
+    if (!webRoot) return false;
+    const rel = path === "/" ? "index.html" : decodeURIComponent(path).replace(/^\/+/, "");
+    const file = resolve(webRoot, rel);
+    if (file !== webRoot && !file.startsWith(webRoot + sep)) return false;
+    const type = MIME[extname(file)];
+    if (!type) return false;
+    try {
+      const data = await readFile(file);
+      res.writeHead(200, { "content-type": type, "cache-control": "no-cache" });
+      res.end(data);
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   async function handleTestsStart(req: IncomingMessage): Promise<JsonResponse> {
     const body = (await readJsonBody(req)) as { agentId?: unknown; type?: unknown; payload?: unknown };
@@ -70,6 +99,25 @@ export function createApiServer(runtime: AgentLabRuntime): Server {
     return json(200, await runtime.providers.test(id));
   }
 
+  // The body is a ProviderConfig: auth.env is the NAME of an env var, never a key value
+  // (assertProviderConfig rejects anything key-shaped). A missing env var fails closed.
+  async function handleProviderAdd(req: IncomingMessage): Promise<JsonResponse> {
+    if (!runtime.providers) return json(404, { error: "no providers configured" });
+    const body = await readJsonBody(req);
+    try {
+      const provider = runtime.providers.add(body);
+      return json(201, { id: provider.id, kind: provider.kind, model: provider.model });
+    } catch (e) {
+      if (e instanceof ProviderError) return json(400, { error: e.message, code: e.code });
+      throw e;
+    }
+  }
+
+  function handleProviderRemove(id: string): JsonResponse {
+    if (!runtime.providers) return json(404, { error: "no providers configured" });
+    return runtime.providers.remove(id) ? json(200, { removed: id }) : json(404, { error: `unknown provider: ${id}` });
+  }
+
   async function handleDeviceDiscover(): Promise<JsonResponse> {
     try {
       const result = await runtime.devices.discover(new AdbDiscovery());
@@ -102,9 +150,19 @@ export function createApiServer(runtime: AgentLabRuntime): Server {
         if (method === "GET" && path === "/providers") {
           return send(res, json(200, runtime.providers?.describe() ?? []));
         }
+        if (method === "GET" && path === "/providers/presets") {
+          return send(res, json(200, PROVIDER_PRESETS));
+        }
+        if (method === "POST" && path === "/providers") {
+          return send(res, await handleProviderAdd(req));
+        }
         const providerTest = /^\/providers\/([^/]+)\/test$/.exec(path);
         if (method === "POST" && providerTest) {
           return send(res, await handleProviderTest(decodeURIComponent(providerTest[1]!)));
+        }
+        const providerById = /^\/providers\/([^/]+)$/.exec(path);
+        if (method === "DELETE" && providerById) {
+          return send(res, handleProviderRemove(decodeURIComponent(providerById[1]!)));
         }
         if (method === "GET" && path === "/devices") {
           return send(res, json(200, runtime.devices.snapshot()));
@@ -122,8 +180,10 @@ export function createApiServer(runtime: AgentLabRuntime): Server {
         if (method === "GET" && path === "/events") {
           return handleEvents(res);
         }
+        if (method === "GET" && (await serveStatic(path, res))) return;
         send(res, json(404, { error: `no route for ${method} ${path}` }));
       } catch (e) {
+        if (e instanceof SyntaxError) return send(res, json(400, { error: "request body is not valid JSON" }));
         send(res, json(500, { error: e instanceof Error ? e.message : String(e) }));
       }
     })();
