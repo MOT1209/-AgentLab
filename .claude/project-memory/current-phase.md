@@ -5,7 +5,7 @@ Phase 6 - skill architecture done (src/skills/, see skills-architecture.md and k
 least-privilege profiles for all 36 agents (effective permissions = granted skills limited by each agent's declared capabilities), generated
 .claude/skills and .agent/skills with drift/hash/safety validation (`npm run skills:list|validate|sync`), and runtime enforcement: handler
 permissions gate SubAgent (BLOCKED), exploration actions are narrowed to the profile, profile limits are ceilings (maxSteps, time, maxLLMCalls,
-maxTokens; BUDGET_EXHAUSTED -> BLOCKED). On by default for the canonical organization (skills:false opts out). 154 tests pass.
+maxTokens; BUDGET_EXCEEDED -> BLOCKED). On by default for the canonical organization (skills:false opts out). 154 tests pass.
 Nothing external installed (skills.sh was unreachable). Still never run against a real device, real adb, or a live LLM.
 Next: close the HIGH known issues; see Roadmap in skills-architecture.md.
 
@@ -44,20 +44,23 @@ openai-compatible instead of hand-writing it; an explicit baseUrl still wins. 10
 typecheck + build clean. "OpenCode/Zen" was requested by the user as a provider but its API shape
 is unconfirmed — not added as a preset yet.
 
+Phase 4.5 — Real Android device validation: **PARTIAL**. All code and tests are in place; the real-device proof is NOT done
+because this environment has no Android device or emulator (no /dev/kvm; the Android SDK download host is blocked).
+Real `adb` 34 was installed here via apt (no device). 126 tests pass + 1 opt-in real-device test (skipped here with a reason).
+
 Phase 4 — first real LLM-driven agent done: MAIN-05-A Exploration Agent (98 tests pass, typecheck + build clean).
 See knowledge/exploration.md. Earlier: agent framework (P2), device runtime (P3), providers (P3.5).
 
-Flow: orchestrator.dispatch("MAIN-05","explore",payload,{signal}) → MAIN-05 leases DEVICE-05 → MAIN-05-A runs
-runExploration(ctx.llm, leased device) → ExplorationResult (ChildOutcome.details) → released.
-Only MAIN-01-B (smoke) and MAIN-05-A (explore) have behavior; the other 22 sub-agents report BLOCKED. MAIN-05-B untouched.
+What exists: deep health check (adb/shell/PNG screenshot/logs) gating the registry; discovery -> health -> registry -> pool;
+structured error codes (DEVICE_UNAVAILABLE/BUSY, NO_DEVICE_ASSIGNED); LLM-call budget (maxLlmCalls) + BUDGET_EXCEEDED;
+package-aware crash detection with process/exception/timestamp; evidence files on disk + result.json; launchActivity;
+UNSUPPORTED_ACTION errors; opt-in `REAL_DEVICE_TEST=1 npm run test:real`; simulated-adb end-to-end test; README section.
+Earlier phases: framework (P2), device runtime (P3), providers (P3.5), Exploration Agent (P4), local web UI.
 
-## Next
-- RUN IT FOR REAL: AdbDevice (swipe/pressKey/ui/clearLogs), a real emulator, a real provider key. Nothing live has been verified.
-- Cost control: budget per provider/run (usage is counted in telemetry but not capped)
-- Edge Case Agent (MAIN-05-B) reusing runExploration with a different system prompt/strategy
-- Persistence of runs/evidence; report output (JSON/Markdown)
-- Dynamic device allocation if fewer than 12 devices
+## Next (to close Phase 4.5)
+- RUN `REAL_DEVICE_TEST=1 npm run test:real` on a real device/emulator and record the result here; fix what breaks.
+- Then try REAL_LLM_TEST=1 once, on a simple app you own.
 
-## UI (added after Phase 4)
-`npm run ui` — local web UI (src/ui/): demo mode verified in headless Chromium; real mode untested on hardware.
-Progress reaches the UI through PROGRESS messages on the bus (HandlerContext.report). 108 tests pass.
+## After that
+- Phase 5: vision / screenshot understanding (the model is blind to pixels today)
+- Cost cap per provider; persistence of runs; more sub-agent behaviors (Crash Hunter, Edge Case); dynamic device allocation

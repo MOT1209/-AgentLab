@@ -1,20 +1,19 @@
 # KNOWN ISSUES
 
-- AdbDevice has no automated test; needs real device/emulator — MEDIUM — open
+- AdbDevice never run on a real device/emulator. Verified: argument construction, simulated adb pipeline, real adb binary without a device — HIGH — open
 - Crash detection is a log-marker match (FATAL EXCEPTION, ANR in, Fatal signal, process died); not a classifier. Logcat is now cleared on LAUNCH_APP in the exploration agent only (smoke handler still does not) — MEDIUM — open
 - No persistence; tasks/evidence/messages live in memory only (MessageBus is bounded at 10k) — MEDIUM — open
 - Capabilities screen_recording, inspect_ui, network_control (and analysis ones) are declared but have no Device/tool implementation — MEDIUM — open
 - Only 2 of 24 SUB agents have behavior (MAIN-01-B smoke, MAIN-05-A explore); the rest report BLOCKED — LOW — open
 - No per-task timeout/cancellation in Agent.run — LOW — open
 - Fixed MAIN->device assignment needs up to 12 devices; with fewer, unassigned MAINs are BLOCKED. Dynamic allocation not built — MEDIUM — open
-- AdbDevice/AdbDiscovery still untested against real adb (only parseAdbDevices is unit-tested) — MEDIUM — open
 - Leases and assignments are in memory only; a process crash loses them (a restarted run starts clean, which is safe, but history is lost) — LOW — open
 - Device capability list is declared per device (defaults to the 8 implemented); AdbDevice does not verify it — LOW — open
 - Providers are only tested with fakes; no live call to Anthropic/OpenAI-compatible endpoints has been made — MEDIUM — open
 - No cost accounting per provider or across runs; each exploration run is now bounded by its profile's maxLLMCalls/maxTokens, but there is no total budget over many runs and no money-denominated cap — MEDIUM — open
 - serverSideFallback request shape follows the SDK skill docs but is unverified live — LOW — open
 - Provider API keys are read from process env; no vault/secret-manager integration — LOW — open
-- Exploration agent has never run against a real device or a live LLM; AdbDevice swipe/pressKey/ui/clearLogs only tested via a fake adb script (argument construction) — HIGH — open
+- Exploration agent has never run against a real device or a live LLM; swipe/pressKey/ui(uiautomator)/clearLogs/screencap only tested via simulated adb — HIGH — open
 - The model is blind to pixels: it only sees the UI hierarchy text. Games, WebViews and canvases expose little or no hierarchy, so exploration there will be weak — HIGH — open
 - UI text/log lines are sent to the LLM provider; apps showing personal data would leak it to that provider — MEDIUM — open
 - No cost cap in money terms (see maxCost above); steps, time, LLM calls and tokens are capped per run by the agent profile — MEDIUM — open
@@ -36,3 +35,8 @@
 - UI real-device mode (device list, key entry, run) has never been exercised against real adb or a live LLM — HIGH — open
 - UI is single-user, single-run, in-memory: refresh keeps the run (server side) but a server restart loses it; no auth beyond the launch token — LOW — open
 - UI polls /api/state once a second and resends all events; fine for <=1000 events, wasteful beyond — LOW — open
+- Phase 4.5 acceptance items NOT proven (need a device): real discovery of a device, real health pass, app launch, real screenshot/UI/logcat content, real crash detection, lease release after a real run — HIGH — open
+- uiautomator dump via `exec-out ... /dev/tty` is device-dependent; some Android versions/OEMs need a file path instead. If GET_UI fails on a real device, this is the first suspect — MEDIUM — open
+- Health check allows a non-PNG screenshot only for MOCK devices; a real device returning odd screencap output is rejected — LOW — open
+- Simulated adb accepts the same commands the code currently sends; if the code changes its commands, update test/support/fake-adb.ts — LOW — open
+- No linter is configured in this project (only tsc strict) — LOW — open

@@ -5,6 +5,7 @@ import type { AgentLimits } from "../../skills/types.js";
 import type { HandlerContext, TaskHandler } from "../managed-agent.js";
 import type { AgentResult } from "../types.js";
 import { ActionExecutor, ActionOutcome } from "./action-executor.js";
+import { createFileEvidenceWriter, writeResultFile } from "./evidence-files.js";
 import { supportedActions, ValidationLimits } from "./action-validator.js";
 import type { AgentDecision } from "./actions.js";
 import { requestDecision } from "./decision.js";
@@ -44,7 +45,12 @@ export interface ExplorationDeps {
 /** The smaller of what the task asked for and what the agent's profile allows. */
 function clampTask(task: ExplorationTask, ceilings?: AgentLimits): ExplorationTask {
   if (!ceilings) return task;
-  return { ...task, maxSteps: Math.min(task.maxSteps, ceilings.maxSteps), timeoutMs: Math.min(task.timeoutMs, ceilings.maxExecutionTimeMs) };
+  return {
+    ...task,
+    maxSteps: Math.min(task.maxSteps, ceilings.maxSteps),
+    maxLlmCalls: Math.min(task.maxLlmCalls, ceilings.maxLLMCalls),
+    timeoutMs: Math.min(task.timeoutMs, ceilings.maxExecutionTimeMs),
+  };
 }
 
 const REPEAT_WARN_AT = 3;
@@ -65,9 +71,10 @@ export async function runExploration(deps: ExplorationDeps): Promise<Exploration
   const evidence = new EvidenceStore(agentId, undefined, now);
   const findings = new FindingLog(agentId, now);
   const packageName = task.app?.packageName;
-  const executor = new ActionExecutor(device, { evidence, ...(packageName ? { packageName } : {}), ...(deps.sleep ? { sleep: deps.sleep } : {}) });
+  if (task.evidenceDir) evidence.persist = createFileEvidenceWriter(task.evidenceDir, taskId);
+  const executor = new ActionExecutor(device, { evidence, ...(packageName ? { packageName } : {}), ...(task.app?.launchActivity ? { launchActivity: task.app.launchActivity } : {}), ...(deps.sleep ? { sleep: deps.sleep } : {}) });
   const deviceActions = supportedActions(device, !!packageName);
-  const supported = deps.permissions ? new Set([...deviceActions].filter((a) => actionAllowed(a, deps.permissions!))) : deviceActions;
+  const supported = deps.permissions ? new Set([...deviceActions].filter((x) => actionAllowed(x, deps.permissions!))) : deviceActions;
   const limits: ValidationLimits = { supported, ...(task.screen ? { screen: task.screen } : {}) };
   const history: ActionRecord[] = [];
   const tel: ExplorationTelemetry = { llmCalls: 0, actions: 0, actionFailures: 0, providerErrors: 0, deviceErrors: 0, malformedResponses: 0, inputTokens: 0, outputTokens: 0, durationMs: 0 };
@@ -107,7 +114,8 @@ export async function runExploration(deps: ExplorationDeps): Promise<Exploration
       (conclusion ? ` Agent's own conclusion (unverified): "${conclusion.slice(0, 300)}"` : "");
     log("finished", { agentId, taskId, status, steps: tel.actions });
     emit({ kind: "finished", status });
-    return {
+    const result: ExplorationResult = {
+      ...(task.evidenceDir ? { evidenceDir: task.evidenceDir } : {}),
       status,
       taskId,
       agentId,
@@ -121,6 +129,8 @@ export async function runExploration(deps: ExplorationDeps): Promise<Exploration
       completedAt: new Date(now()).toISOString(),
       summary,
     };
+    if (task.evidenceDir) writeResultFile(task.evidenceDir, taskId, result as unknown as { evidence: typeof result.evidence } & Record<string, unknown>);
+    return result;
   };
   const aborted = (): ExplorationResult => finish(stop === "timeout" ? "TIMEOUT" : "CANCELLED", stop === "timeout" ? `Stopped after ${task.timeoutMs} ms.` : "Cancelled by the dispatcher.");
 
@@ -167,10 +177,10 @@ export async function runExploration(deps: ExplorationDeps): Promise<Exploration
     }
     try {
       const logs = await device.logs(100);
-      const crash = detectCrash(logs);
+      const crash = detectCrash(logs, packageName);
       if (crash) {
         const logEv = evidence.add("log", crash.excerpt, step);
-        const f = findings.addVerified(crash.signature, "CRITICAL", crash.title, `Detected in device logs after step ${step}: ${crash.excerpt.split("\n")[0]}`, [logEv?.id, obs.screenshotRef].filter((x): x is string => !!x), step);
+        const f = findings.addVerified(crash.signature, crash.severity, crash.title, `Detected in device logs after step ${step}${crash.process ? ` (process ${crash.process})` : ""}${crash.exception ? `, ${crash.exception}` : ""}: ${crash.excerpt.split("\n")[0]}`, [logEv?.id, obs.screenshotRef].filter((x): x is string => !!x), step);
         if (f) {
           errors.push(`CRASH DETECTED (${f.id}): ${crash.title}`);
           emit({ kind: "finding", id: f.id, severity: f.severity, title: f.title, source: f.source });
@@ -213,11 +223,10 @@ export async function runExploration(deps: ExplorationDeps): Promise<Exploration
         available: [...supported],
         ...(warning ? { warning } : {}),
       });
-      const budget = deps.ceilings ? { maxLLMCalls: deps.ceilings.maxLLMCalls, maxTokens: deps.ceilings.maxTokens } : undefined;
-      const out = await requestDecision({ llm, userMessage: message, limits, signal: ctrl.signal, telemetry: tel, ...(budget ? { budget } : {}) });
+      const out = await requestDecision({ llm, userMessage: message, limits, signal: ctrl.signal, telemetry: tel, maxCalls: task.maxLlmCalls, ...(deps.ceilings ? { maxTokens: deps.ceilings.maxTokens } : {}) });
       if (!out.ok) {
         if (out.kind === "ABORTED") return aborted();
-        if (out.kind === "BUDGET") return finish("BUDGET_EXHAUSTED", out.message);
+        if (out.kind === "BUDGET") return finish("BUDGET_EXCEEDED", out.message);
         if (out.kind === "PROVIDER_ERROR") return finish("ERROR", `LLM provider failed: ${out.message}`);
         return finish("ERROR", `The model returned no valid action after one correction attempt (${out.errors.join("; ")}).`);
       }
@@ -240,8 +249,18 @@ export async function runExploration(deps: ExplorationDeps): Promise<Exploration
       const step = ++tel.actions;
       log("action", { agentId, step, action: decision.action.action, reason: decision.reason.slice(0, 120) });
       const result = await executor.execute(decision.action, step, ctrl.signal);
-      history.push({ step, action: decision.action.action, reason: decision.reason, ok: result.ok, detail: result.detail, evidenceIds: result.evidenceIds });
-      emit({ kind: "action", step, action: decision.action.action, params: decision.action, reason: decision.reason, ok: result.ok, detail: result.detail });
+      if (!result.ok) {
+        // A failed action keeps the log tail as evidence, so a launch failure can be diagnosed afterwards.
+        try {
+          const tail = await device.logs(50);
+          const logEv = evidence.add("log", tail.slice(0, 20_000), step);
+          if (logEv?.id) result.evidenceIds.push(logEv.id);
+        } catch {
+          /* device may be gone; handled below */
+        }
+      }
+      history.push({ step, action: decision.action.action, reason: decision.reason, ok: result.ok, detail: result.detail, ...(result.errorCode ? { errorCode: result.errorCode } : {}), evidenceIds: result.evidenceIds });
+      emit({ kind: "action", step, action: decision.action.action, params: decision.action, reason: decision.reason, ok: result.ok, detail: result.detail, ...(result.errorCode ? { errorCode: result.errorCode } : {}) });
       if (!result.ok) {
         tel.actionFailures++;
         log("action_failed", { agentId, step, detail: result.detail.slice(0, 120) });

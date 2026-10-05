@@ -1,7 +1,7 @@
 import type { Evidence, TaskStatus } from "../types.js";
 import type { Finding } from "./findings.js";
 
-export type ExplorationStatus = "PASSED" | "FAILED" | "BLOCKED" | "CANCELLED" | "TIMEOUT" | "MAX_STEPS_REACHED" | "BUDGET_EXHAUSTED" | "ERROR";
+export type ExplorationStatus = "PASSED" | "FAILED" | "BLOCKED" | "CANCELLED" | "TIMEOUT" | "MAX_STEPS_REACHED" | "BUDGET_EXCEEDED" | "ERROR";
 
 export interface ExplorationTelemetry {
   llmCalls: number;
@@ -21,10 +21,13 @@ export interface ActionRecord {
   reason: string;
   ok: boolean;
   detail: string;
+  errorCode?: string;
   evidenceIds: string[];
 }
 
 export interface ExplorationResult {
+  /** Where evidence files and result.json were written, if persistence was enabled. */
+  evidenceDir?: string;
   status: ExplorationStatus;
   taskId: string;
   agentId: string;
@@ -52,7 +55,7 @@ export function toTaskStatus(status: ExplorationStatus, verifiedFailure: boolean
       return "FAILED";
     case "BLOCKED":
     case "TIMEOUT":
-    case "BUDGET_EXHAUSTED":
+    case "BUDGET_EXCEEDED":
       return "BLOCKED";
     case "CANCELLED":
       return "SKIPPED";

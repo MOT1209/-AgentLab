@@ -11,6 +11,8 @@ export class EvidenceStore {
   private screenshots = 0;
   /** Called for every stored item. Used for live UIs; must not throw. */
   onAdd?: (ev: Evidence) => void;
+  /** Writes the evidence somewhere and returns its path. Failures must return undefined, not throw. */
+  persist?: (ev: Evidence) => string | undefined;
 
   constructor(
     private readonly source: string,
@@ -37,6 +39,12 @@ export class EvidenceStore {
       data,
       source: this.source,
     };
+    try {
+      const p = this.persist?.(ev);
+      if (p) ev.path = p;
+    } catch {
+      /* best effort */
+    }
     this.items.push(ev);
     try {
       this.onAdd?.(ev);

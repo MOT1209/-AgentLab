@@ -19,16 +19,21 @@ export class MainAgent extends ManagedAgent {
     if (opts.signal?.aborted) return { status: "SKIPPED", summary: `${this.id}: cancelled before start`, evidence: [] };
     const targets = this.capableChildren(task.type);
     if (targets.length === 0) {
-      return { status: "BLOCKED", summary: `${this.id}: no sub-agent can handle task type '${task.type}'`, evidence: [] };
+      return { status: "BLOCKED", summary: `${this.id}: no sub-agent can handle task type '${task.type}'`, evidence: [], error: { code: "NO_CAPABLE_AGENT", message: `no sub-agent can handle '${task.type}'` } };
     }
 
     const assignment = this.deps.devices.getAssignment(this.id);
     if (!assignment) {
-      return { status: "BLOCKED", summary: `${this.id}: no device assigned`, evidence: [] };
+      return { status: "BLOCKED", summary: `${this.id}: no device assigned`, evidence: [], error: { code: "NO_DEVICE_ASSIGNED", message: `${this.id} has no device` } };
     }
     const health = await this.deps.devices.checkHealth(assignment.deviceId);
     if (!health.ready) {
-      return { status: "BLOCKED", summary: `device ${assignment.deviceId} not ready: ${health.error ?? health.state}`, evidence: [] };
+      return {
+        status: "BLOCKED",
+        summary: `device ${assignment.deviceId} not ready: ${health.error ?? health.state}`,
+        evidence: [],
+        error: { code: "DEVICE_UNAVAILABLE", message: health.error ?? String(health.state), data: { deviceId: assignment.deviceId, state: health.state } },
+      };
     }
 
     this.setStatus("WAITING");
@@ -39,7 +44,12 @@ export class MainAgent extends ManagedAgent {
       { sessionId: task.task_id },
     );
     if (!leased.ok) {
-      return { status: "BLOCKED", summary: `${this.id}: device unavailable: ${leased.message}`, evidence: [] };
+      return {
+        status: "BLOCKED",
+        summary: `${this.id}: device unavailable: ${leased.message}`,
+        evidence: [],
+        error: { code: leased.reason === "ALREADY_LEASED" ? "DEVICE_BUSY" : "DEVICE_UNAVAILABLE", message: leased.message, data: { deviceId: assignment.deviceId, ...(leased.heldBy ? { heldBy: leased.heldBy } : {}) } },
+      };
     }
     const { outcomes, evidence } = leased.value;
 
@@ -65,7 +75,7 @@ export class MainAgent extends ManagedAgent {
       const result = done.result as AgentResult | undefined;
       const summary = result?.summary ?? (done.errors.join("; ") || "no result");
       this.deps.bus.publish(createMessage("TASK_RESULT", child.id, this.id, { status: done.status, summary }, sub.task_id));
-      outcomes.push({ agentId: child.id, taskId: sub.task_id, status: done.status, summary, ...(result?.details !== undefined ? { details: result.details } : {}) });
+      outcomes.push({ agentId: child.id, taskId: sub.task_id, status: done.status, summary, ...(result?.details !== undefined ? { details: result.details } : {}), ...(result?.error ? { error: result.error } : {}) });
       for (const e of result?.evidence ?? []) evidence.push({ ...e, source: e.source ?? child.id });
     }
 

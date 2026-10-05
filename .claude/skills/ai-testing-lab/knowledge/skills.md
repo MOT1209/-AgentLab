@@ -61,7 +61,7 @@ The limits are enforced by the exploration loop. The smoke handler makes no LLM 
 
 On by default for the canonical organization (`initializeAgentLab({ skills: false })` disables; custom `definitions` get none; `skills: <SkillSystem>` supplies your own).
 - `TaskHandler.permissions` (smoke and exploration declare theirs). `SubAgent.execute` blocks a governed handler whose permissions the profile lacks, blocks it when no profile exists (fail closed), and blocks a device source the profile does not allow. All are `BLOCKED`, never `ERROR`. Handlers declaring no permissions are not governed.
-- Exploration narrows its action set to the profile, so a denied action fails validation and never reaches the device. The effective step and time limits are the smaller of the task's and the profile's. `maxLLMCalls` and `maxTokens` are checked before every model call, including the correction retry. Tokens are known only after a call, so one call can overshoot. Exhaustion ends the run as `BUDGET_EXHAUSTED`, reported as `BLOCKED`.
+- Exploration narrows its action set to the profile, so a denied action fails validation and never reaches the device. The effective step and time limits are the smaller of the task's and the profile's. `maxLLMCalls` and `maxTokens` are checked before every model call, including the correction retry. Tokens are known only after a call, so one call can overshoot. Exhaustion ends the run as `BUDGET_EXCEEDED`, reported as `BLOCKED`.
 
 ## Developer environments (.claude and .agent)
 

@@ -24,23 +24,25 @@ export async function requestDecision(opts: {
   limits: ValidationLimits;
   signal: AbortSignal;
   telemetry: ExplorationTelemetry;
+  /** Total LLM requests allowed for the whole run, corrections included. Checked before every call. */
+  maxCalls: number;
   /**
-   * Ceilings checked before EVERY model call, including the correction retry. Tokens are only known
-   * after a call returns, so the last call before the ceiling can overshoot it.
+   * Optional token ceiling (input + output) for the whole run. Tokens are only known after a call
+   * returns, so the last call before the ceiling can overshoot it.
    */
-  budget?: { maxLLMCalls?: number; maxTokens?: number };
+  maxTokens?: number;
 }): Promise<DecisionOutcome> {
-  const { llm, limits, signal, telemetry, budget } = opts;
+  const { llm, limits, signal, telemetry } = opts;
   const messages: { role: "user" | "assistant"; content: string }[] = [{ role: "user", content: opts.userMessage }];
   let lastErrors: string[] = [];
 
   for (let attempt = 0; attempt < 2; attempt++) {
     if (signal.aborted) return { ok: false, kind: "ABORTED" };
-    if (budget?.maxLLMCalls !== undefined && telemetry.llmCalls >= budget.maxLLMCalls) {
-      return { ok: false, kind: "BUDGET", message: `LLM call limit of ${budget.maxLLMCalls} reached.` };
+    if (telemetry.llmCalls >= opts.maxCalls) {
+      return { ok: false, kind: "BUDGET", message: `LLM call limit of ${opts.maxCalls} reached.` };
     }
-    if (budget?.maxTokens !== undefined && telemetry.inputTokens + telemetry.outputTokens >= budget.maxTokens) {
-      return { ok: false, kind: "BUDGET", message: `Token limit of ${budget.maxTokens} reached (${telemetry.inputTokens + telemetry.outputTokens} used).` };
+    if (opts.maxTokens !== undefined && telemetry.inputTokens + telemetry.outputTokens >= opts.maxTokens) {
+      return { ok: false, kind: "BUDGET", message: `Token limit of ${opts.maxTokens} reached (${telemetry.inputTokens + telemetry.outputTokens} used).` };
     }
     let res: LlmResponse;
     telemetry.llmCalls++;

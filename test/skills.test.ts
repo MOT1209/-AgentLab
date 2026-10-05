@@ -582,7 +582,7 @@ test("exploration: maxLLMCalls stops the run before the next model call and maps
   const rt = explorer(llm, withProfile("MAIN-05-A", { limits: { ...LIMITS, maxLLMCalls: 2 } }));
   const t = await rt.orchestrator.dispatch("MAIN-05", "explore", explorePayload);
   const d = explorationOf(t);
-  assert.equal(d.status, "BUDGET_EXHAUSTED");
+  assert.equal(d.status, "BUDGET_EXCEEDED");
   assert.match(d.summary, /LLM call limit of 2 reached/);
   assert.equal(d.telemetry.llmCalls, 2);
   assert.equal(llm.requests.length, 2);
@@ -593,7 +593,7 @@ test("exploration: maxTokens stops the run once the budget is spent (one call ca
   const llm = MockProvider.scripted([wait]);
   const rt = explorer(llm, withProfile("MAIN-05-A", { limits: { ...LIMITS, maxTokens: 20 } }));
   const d = explorationOf(await rt.orchestrator.dispatch("MAIN-05", "explore", explorePayload));
-  assert.equal(d.status, "BUDGET_EXHAUSTED");
+  assert.equal(d.status, "BUDGET_EXCEEDED");
   assert.match(d.summary, /Token limit of 20 reached \(30 used\)/);
   assert.equal(d.telemetry.llmCalls, 2);
 });
@@ -602,7 +602,7 @@ test("exploration: the correction retry also counts against maxLLMCalls", async 
   const llm = MockProvider.scripted(["this is not json"]);
   const rt = explorer(llm, withProfile("MAIN-05-A", { limits: { ...LIMITS, maxLLMCalls: 1 } }));
   const d = explorationOf(await rt.orchestrator.dispatch("MAIN-05", "explore", explorePayload));
-  assert.equal(d.status, "BUDGET_EXHAUSTED");
+  assert.equal(d.status, "BUDGET_EXCEEDED");
   assert.equal(d.telemetry.llmCalls, 1);
   assert.equal(llm.requests.length, 1);
 });

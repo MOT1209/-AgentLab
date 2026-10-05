@@ -5,6 +5,7 @@ import { Device, DeviceError, DeviceInfo, DeviceKey, DeviceSource, DeviceState, 
 
 const run = promisify(execFile);
 const PKG = /^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$/;
+const ACTIVITY = /^\.?[A-Za-z][A-Za-z0-9_$]*(\.[A-Za-z][A-Za-z0-9_$]*)*$/;
 
 /** ADB adapter. Uses execFile (no shell) so arguments cannot inject commands. */
 export class AdbDevice implements Device {
@@ -47,7 +48,12 @@ export class AdbDevice implements Device {
   async install(apkPath: string): Promise<void> {
     await this.adb(["install", "-r", apkPath]);
   }
-  async launch(p: string): Promise<void> {
+  async launch(p: string, activity?: string): Promise<void> {
+    if (activity !== undefined) {
+      if (!ACTIVITY.test(activity)) throw new DeviceError(`invalid activity name: ${activity}`, this.id);
+      await this.adb(["shell", "am", "start", "-n", `${this.pkg(p)}/${activity}`]);
+      return;
+    }
     await this.adb(["shell", "monkey", "-p", this.pkg(p), "-c", "android.intent.category.LAUNCHER", "1"]);
   }
   async stop(p: string): Promise<void> {

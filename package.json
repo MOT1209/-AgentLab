@@ -12,7 +12,8 @@
     "skills:validate": "tsc && node dist/src/skills/cli.js validate",
     "skills:sync": "tsc && node dist/src/skills/cli.js sync",
     "explore": "tsc && node dist/examples/explore.js",
-    "ui": "tsc && node dist/src/ui/main.js"
+    "ui": "tsc && node dist/src/ui/main.js",
+    "test:real": "tsc && REAL_DEVICE_TEST=1 node --test dist/test/real-device.test.js"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
