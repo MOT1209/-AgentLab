@@ -1,0 +1,22 @@
+# KNOWN ISSUES
+
+- AdbDevice has no automated test; needs real device/emulator — MEDIUM — open
+- Crash detection is a log-marker match (FATAL EXCEPTION, ANR in, Fatal signal, process died); not a classifier. Logcat is now cleared on LAUNCH_APP in the exploration agent only (smoke handler still does not) — MEDIUM — open
+- No persistence; tasks/evidence/messages live in memory only (MessageBus is bounded at 10k) — MEDIUM — open
+- Capabilities screen_recording, inspect_ui, network_control (and analysis ones) are declared but have no Device/tool implementation — MEDIUM — open
+- Only 2 of 24 SUB agents have behavior (MAIN-01-B smoke, MAIN-05-A explore); the rest report BLOCKED — LOW — open
+- No per-task timeout/cancellation in Agent.run — LOW — open
+- Fixed MAIN->device assignment needs up to 12 devices; with fewer, unassigned MAINs are BLOCKED. Dynamic allocation not built — MEDIUM — open
+- AdbDevice/AdbDiscovery still untested against real adb (only parseAdbDevices is unit-tested) — MEDIUM — open
+- Leases and assignments are in memory only; a process crash loses them (a restarted run starts clean, which is safe, but history is lost) — LOW — open
+- Device capability list is declared per device (defaults to the 8 implemented); AdbDevice does not verify it — LOW — open
+- Providers are only tested with fakes; no live call to Anthropic/OpenAI-compatible endpoints has been made — MEDIUM — open
+- No usage/cost accounting or budget cap per provider; a looping agent could spend without limit — MEDIUM — open
+- serverSideFallback request shape follows the SDK skill docs but is unverified live — LOW — open
+- Provider API keys are read from process env; no vault/secret-manager integration — LOW — open
+- Exploration agent has never run against a real device or a live LLM; AdbDevice swipe/pressKey/ui/clearLogs only tested via a fake adb script (argument construction) — HIGH — open
+- The model is blind to pixels: it only sees the UI hierarchy text. Games, WebViews and canvases expose little or no hierarchy, so exploration there will be weak — HIGH — open
+- UI text/log lines are sent to the LLM provider; apps showing personal data would leak it to that provider — MEDIUM — open
+- No cost cap: maxSteps/timeout bound a run, but tokens/cost are only reported in telemetry — MEDIUM — open
+- No back-off between LLM calls and no concurrency limit across the 12 MAIN agents (rate limits untested) — LOW — open
+- uiautomator dump can fail while an animation runs or on secure screens (FLAG_SECURE); the agent then sees "ui: unavailable" — LOW — open

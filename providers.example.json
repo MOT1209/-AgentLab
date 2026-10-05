@@ -1,0 +1,27 @@
+{
+  "providers": [
+    {
+      "id": "claude",
+      "kind": "anthropic",
+      "model": "claude-opus-5-5",
+      "auth": { "type": "api_key", "env": "ANTHROPIC_API_KEY" }
+    },
+    {
+      "id": "claude-cheap",
+      "kind": "anthropic",
+      "model": "claude-sonnet-5-5",
+      "auth": { "type": "api_key", "env": "ANTHROPIC_API_KEY" }
+    },
+    {
+      "id": "local-ollama",
+      "kind": "openai-compatible",
+      "baseUrl": "http://localhost:11434/v1",
+      "model": "REPLACE_WITH_A_MODEL_YOU_HAVE_PULLED",
+      "auth": { "type": "none" }
+    }
+  ],
+  "default": "claude-cheap",
+  "agents": {
+    "MAIN-12": "claude"
+  }
+}
