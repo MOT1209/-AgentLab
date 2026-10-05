@@ -25,6 +25,8 @@ export interface Evidence {
   step?: number;
   at?: string;
   data: string; // base64 for binary, text for logs
+  /** Where the evidence was written on disk, if persistence is enabled. */
+  path?: string;
   /** Id of the agent that produced it. */
   source?: string;
 }
@@ -36,6 +38,7 @@ export interface ChildOutcome {
   summary: string;
   /** The child's AgentResult.details, passed up unchanged. */
   details?: unknown;
+  error?: { code: string; message: string; data?: unknown };
 }
 
 export interface AgentResult {
@@ -46,4 +49,6 @@ export interface AgentResult {
   children?: ChildOutcome[];
   /** Handler-specific structured result (e.g. an ExplorationResult). */
   details?: unknown;
+  /** Machine-readable reason for BLOCKED/ERROR results, e.g. DEVICE_UNAVAILABLE. */
+  error?: { code: string; message: string; data?: unknown };
 }

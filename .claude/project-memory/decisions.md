@@ -39,3 +39,10 @@ Format: date — decision — reason
 - UI: zero-dependency local server (node:http) + one self-contained page. Loopback only, Host-header check, random per-start token on every API call (header; query only for GET images/report), JSON-only POSTs, nonce CSP, textContent only (LLM/app text is untrusted). API key kept in process memory via a SecretResolver, never persisted or returned.
 - Live progress is a PROGRESS message type on the existing MessageBus, emitted by handlers through ctx.report. No second event system.
 - Demo mode uses MockDevice with a generated valid PNG and a scripted MockProvider; it must always be labelled as a demo.
+- Phase 4.5: a device enters the registry only after discovery -> deepHealthCheck passes (state==device, shell, PNG screenshot, logs). Rejected devices are reported with the reason, never registered.
+- Real-device test is opt-in (REAL_DEVICE_TEST=1), skips (not fails) when no usable device exists, and fails only if a device exists and the pipeline breaks. Default LLM in it is a scripted mock; REAL_LLM_TEST=1 opts in to the real one.
+- Honesty rule: simulated adb proves process plumbing only; never report it as real-device validation.
+- LLM budget: maxLlmCalls (default maxSteps+5) counts corrections; exceeding it ends the run as BUDGET_EXCEEDED (task BLOCKED). Default timeout is 120 s.
+- Crash detection filters by package when known (other apps' crashes in the shared log are ignored); "process has died" only counts for the app under test and is HIGH, not CRITICAL.
+- Evidence file names are generated (EV-nnn.ext) and the task id is sanitised; files are 0600. The evidence directory is chosen by the caller, never by the model.
+- Blocked tasks carry machine-readable error codes (AgentResult.error): DEVICE_UNAVAILABLE, DEVICE_BUSY, NO_DEVICE_ASSIGNED, NO_CAPABLE_AGENT.

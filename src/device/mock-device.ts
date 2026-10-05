@@ -32,10 +32,10 @@ export class MockDevice implements Device {
     this.guard("install");
     this.installed.add(apkPath);
   }
-  async launch(pkg: string): Promise<void> {
+  async launch(pkg: string, activity?: string): Promise<void> {
     this.guard("launch");
     this.running.add(pkg);
-    this.trace.push(`launch:${pkg}`);
+    this.trace.push(activity ? `launch:${pkg}/${activity}` : `launch:${pkg}`);
   }
   async stop(pkg: string): Promise<void> {
     this.guard("stop");

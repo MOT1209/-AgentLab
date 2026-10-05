@@ -214,6 +214,7 @@ test("manager.discover registers only ready, unknown devices", async () => {
   ];
   m.addDevice(new MockDevice("emulator-5556"), { source: "MOCK" });
   const res = await m.discover({ discover: async () => found }, (d) => new MockDevice(d.serial));
-  assert.deepEqual(res.added.map((x) => [x.id, x.source, x.model]), [["emulator-5554", "EMULATOR", "sdk"]]);
-  assert.deepEqual(res.skipped.map((x) => x.serial), ["R58M", "emulator-5556"]);
+  assert.deepEqual(res.added.map((x) => [x.id, x.source, x.model]), [["emulator-5554", "EMULATOR", "MockPhone"]]);
+  assert.deepEqual(res.skipped.map((x) => x.serial), ["emulator-5556"]);
+  assert.deepEqual(res.rejected.map((x) => [x.serial, x.state]), [["R58M", "unauthorized"]]);
 });

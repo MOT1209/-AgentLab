@@ -1,19 +1,19 @@
 # CURRENT PHASE
 
-Phase 4 — first real LLM-driven agent done: MAIN-05-A Exploration Agent (98 tests pass, typecheck + build clean).
-See knowledge/exploration.md. Earlier: agent framework (P2), device runtime (P3), providers (P3.5).
+Phase 4.5 — Real Android device validation: **PARTIAL**. All code and tests are in place; the real-device proof is NOT done
+because this environment has no Android device or emulator (no /dev/kvm; the Android SDK download host is blocked).
+Real `adb` 34 was installed here via apt (no device). 126 tests pass + 1 opt-in real-device test (skipped here with a reason).
 
-Flow: orchestrator.dispatch("MAIN-05","explore",payload,{signal}) → MAIN-05 leases DEVICE-05 → MAIN-05-A runs
-runExploration(ctx.llm, leased device) → ExplorationResult (ChildOutcome.details) → released.
-Only MAIN-01-B (smoke) and MAIN-05-A (explore) have behavior; the other 22 sub-agents report BLOCKED. MAIN-05-B untouched.
+What exists: deep health check (adb/shell/PNG screenshot/logs) gating the registry; discovery -> health -> registry -> pool;
+structured error codes (DEVICE_UNAVAILABLE/BUSY, NO_DEVICE_ASSIGNED); LLM-call budget (maxLlmCalls) + BUDGET_EXCEEDED;
+package-aware crash detection with process/exception/timestamp; evidence files on disk + result.json; launchActivity;
+UNSUPPORTED_ACTION errors; opt-in `REAL_DEVICE_TEST=1 npm run test:real`; simulated-adb end-to-end test; README section.
+Earlier phases: framework (P2), device runtime (P3), providers (P3.5), Exploration Agent (P4), local web UI.
 
-## Next
-- RUN IT FOR REAL: AdbDevice (swipe/pressKey/ui/clearLogs), a real emulator, a real provider key. Nothing live has been verified.
-- Cost control: budget per provider/run (usage is counted in telemetry but not capped)
-- Edge Case Agent (MAIN-05-B) reusing runExploration with a different system prompt/strategy
-- Persistence of runs/evidence; report output (JSON/Markdown)
-- Dynamic device allocation if fewer than 12 devices
+## Next (to close Phase 4.5)
+- RUN `REAL_DEVICE_TEST=1 npm run test:real` on a real device/emulator and record the result here; fix what breaks.
+- Then try REAL_LLM_TEST=1 once, on a simple app you own.
 
-## UI (added after Phase 4)
-`npm run ui` — local web UI (src/ui/): demo mode verified in headless Chromium; real mode untested on hardware.
-Progress reaches the UI through PROGRESS messages on the bus (HandlerContext.report). 108 tests pass.
+## After that
+- Phase 5: vision / screenshot understanding (the model is blind to pixels today)
+- Cost cap per provider; persistence of runs; more sub-agent behaviors (Crash Hunter, Edge Case); dynamic device allocation

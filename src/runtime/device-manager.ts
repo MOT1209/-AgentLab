@@ -3,6 +3,7 @@ import type { Device } from "../device/types.js";
 import { AdbDevice, adbSourceOf } from "../device/adb-device.js";
 import { DeviceError } from "../device/types.js";
 import { DeviceDiscovery, DiscoveredDevice } from "./discovery.js";
+import { DeviceHealth, deepHealthCheck, normalizeAdbState } from "./health.js";
 import { DevicePool, PoolOptions } from "./device-pool.js";
 import { DeviceRecord, DeviceRegistry, RegisterOptions } from "./device-registry.js";
 import {
@@ -27,9 +28,19 @@ export interface AvailabilityFilter {
   predicate?: (rec: Readonly<DeviceRecord>) => boolean;
 }
 
+export interface RejectedDevice {
+  serial: string;
+  state: string;
+  reason: string;
+  health?: DeviceHealth;
+}
+
 export interface DiscoveryResult {
   added: DeviceSnapshot[];
+  /** Already registered. */
   skipped: DiscoveredDevice[];
+  /** Seen by discovery but not usable (unauthorized, offline, failed health check). Never registered. */
+  rejected: RejectedDevice[];
 }
 
 /**
@@ -73,16 +84,26 @@ export class DeviceManager {
   ): Promise<DiscoveryResult> {
     const added: DeviceSnapshot[] = [];
     const skipped: DiscoveredDevice[] = [];
+    const rejected: RejectedDevice[] = [];
     for (const d of await discovery.discover()) {
-      if (d.state !== "device" || this.registry.has(d.serial)) {
+      if (this.registry.has(d.serial)) {
         skipped.push(d);
         continue;
       }
+      // discovery -> health check -> registry. Unhealthy devices never enter the registry.
+      const device = create(d);
+      const health = await deepHealthCheck(device, d.state);
+      if (!health.healthy) {
+        rejected.push({ serial: d.serial, state: normalizeAdbState(d.state), reason: health.errors[0] ?? "health check failed", health });
+        continue;
+      }
       const opts: RegisterOptions = { source: adbSourceOf(d.serial), serial: d.serial };
-      if (d.model) opts.model = d.model;
-      added.push(this.addDevice(create(d), opts));
+      const model = health.model ?? d.model;
+      if (model) opts.model = model;
+      if (health.androidVersion) opts.androidVersion = health.androidVersion;
+      added.push(this.addDevice(device, opts));
     }
-    return { added, skipped };
+    return { added, skipped, rejected };
   }
 
   findAvailable(filter: AvailabilityFilter = {}): DeviceSnapshot | undefined {
@@ -110,6 +131,15 @@ export class DeviceManager {
       const error = e instanceof DeviceError ? e.message : e instanceof Error ? e.message : String(e);
       return { deviceId, ready: false, state: rec.device.state(), error, checkedAt };
     }
+  }
+
+  /** Full probe (command, screenshot, logs). Slower than checkHealth(); use when registering or diagnosing. */
+  async deepHealth(deviceId: string): Promise<DeviceHealth | undefined> {
+    const rec = this.registry.get(deviceId);
+    if (!rec) return undefined;
+    const h = await deepHealthCheck(rec.device);
+    if (h.healthy) this.registry.updateInfo(deviceId, { ...(h.model ? { model: h.model } : {}), ...(h.androidVersion ? { androidVersion: h.androidVersion } : {}) });
+    return h;
   }
 
   // ---- locking -----------------------------------------------------------------------------

@@ -137,7 +137,7 @@ objDef:'استكشف التطبيق وابحث عن الانهيارات وعط�
 start:'ابدأ الاختبار',cancel:'إيقاف',live:'النتيجة المباشرة',idle:'جاهز',running:'يعمل...',
 empty:'لا يوجد تشغيل بعد. اختر الوضع واضغط «ابدأ الاختبار».',steps2:'الخطوات',find:'النتائج (Findings)',noFind:'لا نتائج.',
 verified:'مُتحقَّق منه',ai:'ملاحظة النموذج (غير مؤكدة)',download:'تنزيل التقرير (JSON)',
-PASSED:'نجح',FAILED:'فشل (عُثر على علّة)',BLOCKED:'متعثر',CANCELLED:'أُلغي',TIMEOUT:'انتهت المهلة',MAX_STEPS_REACHED:'بلغ حد الخطوات',ERROR:'خطأ',
+PASSED:'نجح',FAILED:'فشل (عُثر على علّة)',BLOCKED:'متعثر',CANCELLED:'أُلغي',TIMEOUT:'انتهت المهلة',MAX_STEPS_REACHED:'بلغ حد الخطوات',BUDGET_EXCEEDED:'بلغ حد طلبات النموذج',ERROR:'خطأ',
 actions:'إجراءات',failed:'فاشلة',calls:'طلبات للنموذج',tokens:'رموز (دخل/خرج)',secs:'ثانية',ok:'نجح: ',bad:'فشل: ',
 needDev:'اختر جهازاً أولاً.',needPkg:'أدخل اسم الحزمة.',needModel:'أعدّ النموذج أولاً.',saved:'تم الحفظ.',testing:'جارٍ الاختبار...',noToken:'افتح الرابط الذي طُبع في الطرفية (يحتوي على رمز سري).'},
 en:{tagline:'AI-driven Android app testing',mode:'Mode',demo:'Demo (no device, no key)',real:'Real device',
@@ -152,7 +152,7 @@ objDef:'Explore the application and identify crashes, broken navigation, unrespo
 start:'Start test',cancel:'Stop',live:'Live result',idle:'Ready',running:'Running...',
 empty:'No run yet. Pick a mode and press "Start test".',steps2:'Steps',find:'Findings',noFind:'No findings.',
 verified:'verified',ai:'model observation (unverified)',download:'Download report (JSON)',
-PASSED:'Passed',FAILED:'Failed (bug found)',BLOCKED:'Blocked',CANCELLED:'Cancelled',TIMEOUT:'Timed out',MAX_STEPS_REACHED:'Step limit reached',ERROR:'Error',
+PASSED:'Passed',FAILED:'Failed (bug found)',BLOCKED:'Blocked',CANCELLED:'Cancelled',TIMEOUT:'Timed out',MAX_STEPS_REACHED:'Step limit reached',BUDGET_EXCEEDED:'LLM call limit reached',ERROR:'Error',
 actions:'actions',failed:'failed',calls:'model calls',tokens:'tokens (in/out)',secs:'s',ok:'OK: ',bad:'Failed: ',
 needDev:'Select a device first.',needPkg:'Enter the package name.',needModel:'Configure the model first.',saved:'Saved.',testing:'Testing...',noToken:'Open the link printed in the terminal (it contains a secret token).'}
 };

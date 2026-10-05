@@ -169,9 +169,10 @@ test("device refresh: adb missing is a readable message, found devices are liste
   assert.match((missing.state().devices as { error: string }).error, /adb not found/);
 
   const found: DeviceDiscovery = { discover: async () => [{ serial: "emulator-5554", state: "device", model: "sdk" }, { serial: "R58", state: "unauthorized" }] };
-  const app = new UiApp({ discovery: found });
+  const app = new UiApp({ discovery: found, createDevice: (d) => new MockDevice(d.serial) });
   await app.refreshDevices();
   const list = (app.state().devices as { list: Array<{ id: string; source: string }> }).list;
   assert.deepEqual(list.map((d) => [d.id, d.source]), [["emulator-5554", "EMULATOR"]]);
+  assert.match((app.state().devices as { error: string }).error, /R58: device is unauthorized/); // the user is told why
   assert.ok(MockDevice && UiError);
 });

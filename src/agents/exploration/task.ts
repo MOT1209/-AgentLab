@@ -2,7 +2,8 @@ import type { AppContext } from "./observation.js";
 
 export const DEFAULT_MAX_STEPS = 20;
 export const HARD_MAX_STEPS = 200;
-export const DEFAULT_TIMEOUT_MS = 300_000;
+export const DEFAULT_TIMEOUT_MS = 120_000;
+export const HARD_MAX_LLM_CALLS = 1000;
 export const HARD_MAX_TIMEOUT_MS = 1_800_000;
 
 export interface ExplorationObjective {
@@ -16,7 +17,11 @@ export interface ExplorationTask {
   objective: ExplorationObjective;
   app?: AppContext;
   maxSteps: number;
+  /** Hard cap on LLM requests (including correction attempts). Default: maxSteps + 5. */
+  maxLlmCalls: number;
   timeoutMs: number;
+  /** If set, evidence files and result.json are written under <evidenceDir>/<taskId>/. Set by the caller, never by the model. */
+  evidenceDir?: string;
   screen?: { width: number; height: number };
   captureScreenshots: boolean;
 }
@@ -60,6 +65,13 @@ export function parseExplorationTask(payload: unknown): { ok: true; task: Explor
   };
   const maxSteps = int(payload.maxSteps, "maxSteps", DEFAULT_MAX_STEPS, 1, HARD_MAX_STEPS);
   const timeoutMs = int(payload.timeoutMs, "timeoutMs", DEFAULT_TIMEOUT_MS, 1, HARD_MAX_TIMEOUT_MS);
+  const maxLlmCalls = int(payload.maxLlmCalls, "maxLlmCalls", maxSteps + 5, 1, HARD_MAX_LLM_CALLS);
+  let evidenceDir: string | undefined;
+  if (payload.evidenceDir !== undefined) {
+    const d = payload.evidenceDir;
+    if (typeof d === "string" && d.length > 0 && d.length < 500 && !d.includes("\0") && (d.startsWith("/") || /^[A-Za-z]:[\\/]/.test(d))) evidenceDir = d;
+    else errors.push("evidenceDir must be an absolute path");
+  }
 
   let screen: ExplorationTask["screen"];
   if (payload.screen !== undefined) {
@@ -73,6 +85,6 @@ export function parseExplorationTask(payload: unknown): { ok: true; task: Explor
   if (errors.length > 0 || !objective) return { ok: false, errors };
   return {
     ok: true,
-    task: { objective, ...(app ? { app } : {}), maxSteps, timeoutMs, ...(screen ? { screen } : {}), captureScreenshots: payload.captureScreenshots !== false },
+    task: { objective, ...(app ? { app } : {}), maxSteps, maxLlmCalls, timeoutMs, ...(evidenceDir ? { evidenceDir } : {}), ...(screen ? { screen } : {}), captureScreenshots: payload.captureScreenshots !== false },
   };
 }

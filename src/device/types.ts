@@ -31,7 +31,8 @@ export interface Device {
   state(): DeviceState;
   info(): Promise<DeviceInfo>;
   install(apkPath: string): Promise<void>;
-  launch(packageName: string): Promise<void>;
+  /** `activity` (e.g. ".MainActivity") selects a specific entry point; otherwise the launcher activity is started. */
+  launch(packageName: string, activity?: string): Promise<void>;
   stop(packageName: string): Promise<void>;
   screenshot(): Promise<Buffer>;
   tap(x: number, y: number): Promise<void>;

@@ -15,29 +15,56 @@ export interface Finding {
   source: FindingSource;
 }
 
-const CRASH_PATTERNS: Array<{ re: RegExp; title: string }> = [
-  { re: /FATAL EXCEPTION/, title: "Application crash (fatal exception)" },
-  { re: /\bANR in\b/, title: "Application not responding (ANR)" },
-  { re: /Fatal signal \d+/, title: "Native crash (fatal signal)" },
-  { re: /Process .* \(pid \d+\) has died/, title: "Application process died" },
-];
-
 export interface CrashSignal {
   title: string;
+  severity: Severity;
   /** Stable key so the same logcat line is only reported once. */
   signature: string;
   excerpt: string;
+  /** Crashed process, when the log says so. */
+  process?: string;
+  exception?: string;
+  timestamp?: string;
 }
 
-/** Deliberately simple: looks for obvious crash markers in log text. Not a classifier. */
-export function detectCrash(logs: string): CrashSignal | undefined {
+const TS = /^(\d\d-\d\d \d\d:\d\d:\d\d\.\d+)/;
+const ownsProcess = (proc: string | undefined, pkg: string | undefined): boolean =>
+  !pkg || !proc || proc === pkg || proc.startsWith(`${pkg}:`); // secondary processes look like "pkg:service"
+
+/**
+ * Looks for real crash markers. With `packageName`, crashes of OTHER apps in the shared system log are ignored
+ * (the main source of false positives). Simple on purpose: this is a detector, not a classifier.
+ */
+export function detectCrash(logs: string, packageName?: string): CrashSignal | undefined {
   const lines = logs.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
-    for (const p of CRASH_PATTERNS) {
-      if (p.re.test(line)) {
-        return { title: p.title, signature: line.trim(), excerpt: lines.slice(i, i + 4).join("\n").slice(0, 600) };
-      }
+    const timestamp = TS.exec(line)?.[1];
+    const tail = lines.slice(i, i + 12);
+    const excerpt = lines.slice(i, i + 4).join("\n").slice(0, 600);
+    const base = { signature: line.trim(), excerpt, ...(timestamp ? { timestamp } : {}) };
+
+    if (/FATAL EXCEPTION/.test(line)) {
+      const proc = /Process:\s*([\w.:]+),\s*PID/.exec(tail.join("\n"))?.[1];
+      if (!ownsProcess(proc, packageName)) continue;
+      const exception = tail.slice(1).map((l) => /([\w$.]+(?:Exception|Error))\b/.exec(l)?.[1]).find(Boolean);
+      return { title: "Application crash (fatal exception)", severity: "CRITICAL", ...base, ...(proc ? { process: proc } : {}), ...(exception ? { exception } : {}) };
+    }
+    const anr = /\bANR in ([\w.:]+)/.exec(line);
+    if (anr) {
+      if (!ownsProcess(anr[1], packageName)) continue;
+      return { title: "Application not responding (ANR)", severity: "CRITICAL", ...base, process: anr[1]! };
+    }
+    if (/Fatal signal \d+/.test(line)) {
+      const proc = />>> ([\w.:]+) <<</.exec(tail.join("\n"))?.[1];
+      if (!ownsProcess(proc, packageName)) continue;
+      return { title: "Native crash (fatal signal)", severity: "CRITICAL", ...base, ...(proc ? { process: proc } : {}) };
+    }
+    const died = /Process ([\w.:]+) \(pid \d+\) has died/.exec(line);
+    if (died) {
+      // Only for our own app: system logs say this for every background kill.
+      if (!packageName || !ownsProcess(died[1], packageName)) continue;
+      return { title: "Application process died (crash or system kill)", severity: "HIGH", ...base, process: died[1]! };
     }
   }
   return undefined;
@@ -47,7 +74,7 @@ export function detectCrash(logs: string): CrashSignal | undefined {
 export function relevantLogLines(logs: string, max = 5): string[] {
   return logs
     .split(/\r?\n/)
-    .filter((l) => /(^|\s)E[/ ]/.test(l) || CRASH_PATTERNS.some((p) => p.re.test(l)))
+    .filter((l) => /(^|\s)E[/ ]/.test(l) || /FATAL EXCEPTION|\bANR in\b|Fatal signal \d+/.test(l))
     .slice(-max)
     .map((l) => l.slice(0, 200));
 }

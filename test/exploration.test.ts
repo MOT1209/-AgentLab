@@ -22,7 +22,7 @@ const tap = (x: number, y: number, extra: object = {}) => ({ json: { action: "TA
 const end = (reason = "done") => ({ json: { action: "END_TEST", reason } });
 
 function task(over: Partial<ExplorationTask> = {}): ExplorationTask {
-  return { objective: { summary: "Explore the app" }, app: { packageName: PKG }, maxSteps: 20, timeoutMs: 5000, captureScreenshots: true, ...over };
+  return { objective: { summary: "Explore the app" }, app: { packageName: PKG }, maxSteps: 20, maxLlmCalls: 25, timeoutMs: 5000, captureScreenshots: true, ...over };
 }
 function run(llm: LlmProvider, device = new MockDevice("DEVICE-05"), over: Partial<ExplorationTask> = {}, signal?: AbortSignal) {
   return runExploration({ taskId: "T-1", agentId: "MAIN-05-A", deviceId: device.id, device, llm, task: task(over), ...(signal ? { signal } : {}), log: () => undefined });
@@ -100,7 +100,7 @@ test("parseJsonObject accepts bare and fenced JSON only", () => {
 
 test("task parsing: defaults, caps and rejection", () => {
   const ok = parseExplorationTask({ objective: "Explore", app: { packageName: PKG } });
-  assert.ok(ok.ok && ok.task.maxSteps === 20 && ok.task.timeoutMs === 300_000 && ok.task.captureScreenshots);
+  assert.ok(ok.ok && ok.task.maxSteps === 20 && ok.task.timeoutMs === 120_000 && ok.task.captureScreenshots);
   for (const bad of [{}, { objective: "x", maxSteps: 0 }, { objective: "x", maxSteps: 9999 }, { objective: "x", app: { packageName: "bad name; rm" } }, { objective: "x", timeoutMs: 1.5 }]) {
     assert.equal(parseExplorationTask(bad).ok, false, JSON.stringify(bad));
   }

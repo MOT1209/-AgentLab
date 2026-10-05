@@ -9,7 +9,8 @@ export type DecisionOutcome =
   | { ok: true; decision: AgentDecision }
   | { ok: false; kind: "INVALID_OUTPUT"; errors: string[] }
   | { ok: false; kind: "PROVIDER_ERROR"; message: string }
-  | { ok: false; kind: "ABORTED" };
+  | { ok: false; kind: "ABORTED" }
+  | { ok: false; kind: "BUDGET" };
 
 const MAX_DECISION_TOKENS = 1024;
 
@@ -23,6 +24,8 @@ export async function requestDecision(opts: {
   limits: ValidationLimits;
   signal: AbortSignal;
   telemetry: ExplorationTelemetry;
+  /** Total LLM requests allowed for the whole run, corrections included. */
+  maxCalls: number;
 }): Promise<DecisionOutcome> {
   const { llm, limits, signal, telemetry } = opts;
   const messages: { role: "user" | "assistant"; content: string }[] = [{ role: "user", content: opts.userMessage }];
@@ -30,6 +33,7 @@ export async function requestDecision(opts: {
 
   for (let attempt = 0; attempt < 2; attempt++) {
     if (signal.aborted) return { ok: false, kind: "ABORTED" };
+    if (telemetry.llmCalls >= opts.maxCalls) return { ok: false, kind: "BUDGET" };
     let res: LlmResponse;
     telemetry.llmCalls++;
     try {

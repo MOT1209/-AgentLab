@@ -6,7 +6,7 @@ An AI-driven Android application and game testing platform, built around a fixed
 
 - TypeScript on Node 22, strict mode, tests with `node:test`
 - One runtime dependency: `@anthropic-ai/sdk`
-- 108 tests, all offline (mock devices, mock LLM, no API keys)
+- 126 tests, all offline (1 more is opt-in and needs a real device) (mock devices, mock LLM, no API keys)
 
 ---
 
@@ -47,9 +47,9 @@ Full 36-agent list: [`.claude/skills/ai-testing-lab/knowledge/agents.md`](.claud
 | Agent framework, registry, factory, delegation, status tracking | Built, tested (mock) |
 | Device runtime: leases, assignments, health, discovery | Built, tested (mock). Lease race conditions covered. |
 | LLM providers (Anthropic, OpenAI-compatible, Mock) | Built, tested **with fakes only**. No live call has been made. |
-| `AdbDevice` / `AdbDiscovery` | Built. Tested only for argument construction (fake `adb` script) and output parsing. **Never run against real `adb`.** |
+| `AdbDevice` / `AdbDiscovery` / health check | Built. Verified against the **real `adb` binary without a device** (discovery output format, "device not found" failures) and against a **simulated** `adb` script (full pipeline). **Never run on a real phone or emulator.** |
 | `MAIN-01-B` smoke test (install, launch, screenshot, crash-in-logs check) | Built, tested (mock) |
-| `MAIN-05-A` Exploration Agent (LLM-driven loop) | Built, tested (mock device + scripted LLM). **Never run live.** |
+| `MAIN-05-A` Exploration Agent (LLM-driven loop) | Built, tested (mock device, simulated adb, scripted LLM). **Never run on a real device or with a live LLM.** |
 | The other 22 sub-agents | Registered, **no behavior**. They return `BLOCKED`. |
 | Local web UI (`npm run ui`): demo run verified in a headless browser; real-device mode never run | Built |
 | Persistence, cost caps, vision, multi-user/remote access | **Not built** |
@@ -73,7 +73,7 @@ Requirements: Node 22+, npm. For real runs also `adb` (Android SDK platform-tool
 git clone https://github.com/MOT1209/-AgentLab.git
 cd -AgentLab
 npm install
-npm test          # typecheck + build + 108 tests, fully offline
+npm test          # typecheck + build + 126 tests, fully offline
 ```
 
 Other scripts: `npm run typecheck`, `npm run build`.
@@ -165,6 +165,65 @@ A **subscription** (Claude Pro/Max, ChatGPT Plus) is not an API credential and i
 
 ---
 
+## Real Android Device Testing
+
+Status: **the code path is complete and tested against a simulated `adb`, but it has not yet been proven on a real device or emulator.** This section is how to prove it. The standard `npm test` never needs any of this.
+
+**What you need**
+
+1. **adb** (Android platform-tools): Linux `sudo apt install adb`; macOS `brew install --cask android-platform-tools`; Windows: download "SDK Platform-Tools" from developer.android.com and add the folder to `PATH`. Check: `adb version`.
+2. **A device**, either:
+   - an **emulator**: Android Studio → Device Manager → create and start a virtual device (needs hardware virtualization); or
+   - a **phone**: Settings → About phone → tap *Build number* 7 times → Settings → Developer options → enable *USB debugging* → connect by USB → accept the "Allow USB debugging?" prompt on the phone.
+3. **Check it:** `adb devices -l` must list your device as `device`.
+
+| `adb devices` shows | Meaning | What AgentLab does |
+|---|---|---|
+| `device` | ready | health-checked, then registered |
+| `unauthorized` | you have not accepted the prompt on the phone | rejected, with that instruction |
+| `offline` | stuck connection | rejected; try `adb kill-server`, replug |
+| anything else | unknown state | rejected |
+
+A device enters the registry only after a health check passes: `adb` state, a shell command (model, Android version), a screenshot (must be a real PNG) and a log read.
+
+**Run the real-device test (opt-in)**
+
+```bash
+REAL_DEVICE_TEST=1 npm run test:real
+```
+
+It is **skipped** (not failed) if the variable is unset, `adb` is missing or no usable device exists, and the skip message says why. It fails only if a usable device exists and the pipeline does not work. It runs: discover → health → register → lease → assign to `MAIN-05` → launch app → UI hierarchy → screenshot → logs → one safe action (`BACK`) → crash scan → result → release → "device available again". By default the LLM is a scripted mock, so no key is needed and no money is spent; the actions still run on the real device.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `REAL_DEVICE_TEST` | unset | `1` enables the test |
+| `TEST_DEVICE_SERIAL` | first healthy device | which device |
+| `TEST_APP_PACKAGE` | `com.android.settings` | app to launch (Settings exists everywhere) |
+| `TEST_APP_ACTIVITY` | launcher activity | e.g. `.MainActivity` |
+| `TEST_APK_PATH` | unset | install this APK first (otherwise the app must already be installed). No APK is shipped in this repo. |
+| `REAL_LLM_TEST` | unset | `1` uses the real LLM; needs `ANTHROPIC_API_KEY` (model: `REAL_LLM_MODEL`). **Costs money.** |
+
+**Reading the evidence.** Every run writes to `<evidence dir>/<task id>/` (the test prints it; the example script uses `out/`): `EV-001.png` etc. are screenshots, `*.txt` are log excerpts and action results, `*.json` are UI hierarchies, and `result.json` is the full result with each evidence item's `path`. In `result.json`: `status`, `actionLog` (what was done, `ok`, `errorCode`, and the evidence ids for each step), `findings` (`VERIFIED` = detected from logs by the system; `AI_OBSERVATION` = the model's unverified claim) and `telemetry` (LLM calls, tokens, time). Evidence files are created `0600`. The test checks that your API key does not appear in them.
+
+**Budgets.** Every run is bounded by `maxSteps` (default 20), `maxLlmCalls` (default `maxSteps + 5`, correction attempts included) and `timeoutMs` (default 120000), plus cancellation. Exceeding the call budget ends the run as `BUDGET_EXCEEDED`; token usage is reported either way.
+
+**When the device misbehaves**
+
+| Situation | Result |
+|---|---|
+| Device offline / unauthorized / not found before the run | task `BLOCKED`, `error.code = DEVICE_UNAVAILABLE`, nothing is leased |
+| Device already used by something else | `BLOCKED`, `DEVICE_BUSY`, with who holds it |
+| Device unplugged mid-run | run ends `BLOCKED`, evidence so far is kept, the lease is released |
+| App fails to launch | the action is recorded with its error code and the last 50 log lines as evidence; the model sees the failure and may recover |
+| Action the device cannot do | `UNSUPPORTED_ACTION`; never faked or silently ignored |
+| LLM timeout / provider error | `TIMEOUT` / `ERROR`, lease released |
+
+The model can only choose from the fixed action list. There is no shell, no raw `adb` command and no way to name another package; `TYPE` text is stripped of shell metacharacters and every `adb` call uses a fixed argument list (no shell).
+
+Google accounts, the Play Store and parallel multi-agent runs are deliberately **not** part of this phase.
+
+---
+
 ## The Exploration Agent (`MAIN-05-A`)
 
 Task type `explore`. Each step: observe → ask the LLM → parse JSON → **validate** → execute → observe.
@@ -176,7 +235,9 @@ Task type `explore`. Each step: observe → ask the LLM → parse JSON → **val
 | `objective` | required | string, or `{ summary, focus? }` |
 | `app` | none | `{ packageName?, name?, launchActivity?, version? }`. Without `packageName`, launch/stop are unavailable. |
 | `maxSteps` | 20 (max 200) | Counts executed actions. `END_TEST` is free. |
-| `timeoutMs` | 300000 (max 1800000) | |
+| `timeoutMs` | 120000 (max 1800000) | |
+| `maxLlmCalls` | `maxSteps + 5` (max 1000) | Hard cap on LLM requests, corrections included |
+| `evidenceDir` | none | Absolute path. If set, evidence files and `result.json` are written there. Set by the caller, never by the model. |
 | `screen` | none | `{ width, height }`; coordinates are bounds-checked if given |
 | `captureScreenshots` | true | Stored as evidence; never sent to the LLM |
 
@@ -184,7 +245,7 @@ Task type `explore`. Each step: observe → ask the LLM → parse JSON → **val
 
 **Safety boundary.** The model returns one JSON object per turn. `validateDecision` is the only way that output becomes an action: unknown actions, bad parameters and out-of-range coordinates are rejected, unknown keys are ignored. The executor is an exhaustive `switch` over `Device` methods. There is no shell, arbitrary-ADB, file or network action, and the model cannot name a package; launch/stop act only on the app configured in the task.
 
-**Results.** An `ExplorationResult` (status, steps, findings, evidence, action log, telemetry incl. tokens, timestamps) is returned in `result.children[0].details`. Statuses: `PASSED`, `FAILED`, `BLOCKED`, `CANCELLED`, `TIMEOUT`, `MAX_STEPS_REACHED`, `ERROR`.
+**Results.** An `ExplorationResult` (status, steps, findings, evidence, action log, telemetry incl. tokens, timestamps) is returned in `result.children[0].details`. Statuses: `PASSED`, `FAILED`, `BLOCKED`, `CANCELLED`, `TIMEOUT`, `MAX_STEPS_REACHED`, `BUDGET_EXCEEDED`, `ERROR`.
 
 Findings are split by trust:
 
@@ -233,7 +294,7 @@ src/
   bootstrap.ts       initializeAgentLab()
   orchestrator.ts    dispatch (with cancellation)
 examples/            runnable example (explore.ts)
-test/                108 offline tests
+test/                126 offline tests + 1 opt-in real-device test
 .claude/
   skills/ai-testing-lab/   project skill: architecture, agents, android, providers, exploration notes
   project-memory/          current phase, decisions, known issues, completed work
@@ -246,7 +307,7 @@ AgentLab is for testing applications and games you own or are authorized to test
 
 ## Roadmap (next)
 
-1. A real run: emulator + live provider, and fix what breaks.
+1. A real run on a real device/emulator (see *Real Android Device Testing*), and fix what breaks.
 2. Vision input (send screenshots to the model) for games and canvas-heavy apps.
 3. Cost budget per run/provider.
 4. Run reports (JSON/Markdown) and persistence.

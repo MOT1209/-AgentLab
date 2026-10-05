@@ -14,6 +14,9 @@
  *   --providers <file>     provider config JSON (default: use ANTHROPIC_API_KEY)
  *   --model <id>           model for the default Anthropic provider (default claude-sonnet-5-5)
  *   --out <dir>            report directory (default ./out)
+ *   --activity <name>      entry activity (e.g. .MainActivity); default: the launcher activity
+ *   --max-llm-calls <n>    hard cap on LLM requests (default: max-steps + 5)
+ *   --evidence-dir <dir>   absolute path; evidence files + result.json are written there (default: <out>/<task>)
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -48,6 +51,9 @@ const maxSteps = Number(opt["max-steps"] ?? 15);
 const timeoutMs = Number(opt.timeout ?? 180_000);
 const objective = typeof opt.objective === "string" ? opt.objective : "Explore the application and identify crashes, broken navigation, unresponsive controls and obvious UI problems.";
 const outDir = typeof opt.out === "string" ? opt.out : "out";
+const activity = typeof opt.activity === "string" ? opt.activity : undefined;
+const maxLlmCalls = opt["max-llm-calls"] !== undefined ? Number(opt["max-llm-calls"]) : undefined;
+const evidenceDir = typeof opt["evidence-dir"] === "string" ? opt["evidence-dir"] : undefined;
 
 let rt;
 if (mock) {
@@ -94,7 +100,7 @@ process.once("SIGINT", () => {
   ac.abort();
 });
 
-const task = await rt.orchestrator.dispatch("MAIN-05", "explore", { objective, app: { packageName: pkg }, maxSteps, timeoutMs }, { signal: ac.signal });
+const task = await rt.orchestrator.dispatch("MAIN-05", "explore", { objective, app: { packageName: pkg, ...(activity ? { launchActivity: activity } : {}) }, maxSteps, timeoutMs, ...(maxLlmCalls ? { maxLlmCalls } : {}), ...(evidenceDir ? { evidenceDir } : {}) }, { signal: ac.signal });
 const child = (task.result as AgentResult | undefined)?.children?.[0];
 const result = child?.details as ExplorationResult | undefined;
 

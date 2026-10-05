@@ -7,7 +7,8 @@ import { demoScreenshot } from "./demo-png.js";
 import { MockProvider } from "../providers/mock-provider.js";
 import { ProviderManager } from "../providers/manager.js";
 import type { ProviderConfig } from "../providers/types.js";
-import { AdbDiscovery, DeviceDiscovery } from "../runtime/discovery.js";
+import type { Device } from "../device/types.js";
+import { AdbDiscovery, DeviceDiscovery, DiscoveredDevice } from "../runtime/discovery.js";
 import { DeviceManager } from "../runtime/device-manager.js";
 import type { DeviceSnapshot } from "../runtime/types.js";
 
@@ -73,7 +74,7 @@ export class UiApp {
   private providerTest: { ok: boolean; message: string } | undefined;
   private run: RunState | undefined;
 
-  constructor(private readonly opts: { discovery?: DeviceDiscovery } = {}) {}
+  constructor(private readonly opts: { discovery?: DeviceDiscovery; createDevice?: (d: DiscoveredDevice) => Device } = {}) {}
 
   // ---- devices -----------------------------------------------------------------------------
 
@@ -89,7 +90,9 @@ export class UiApp {
           }
         }
       }
-      await this.devices.discover(this.opts.discovery ?? new AdbDiscovery());
+      const res = await this.devices.discover(this.opts.discovery ?? new AdbDiscovery(), this.opts.createDevice);
+      // Tell the user why a device that adb can see is not usable.
+      if (res.rejected.length > 0) this.deviceError = res.rejected.map((r) => `${r.serial}: ${r.reason}`).join(" | ");
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       this.deviceError = /ENOENT/.test(msg)
