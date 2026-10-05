@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-export type MessageType = "TASK_ASSIGNED" | "TASK_RESULT" | "STATUS_CHANGED" | "ERROR";
+export type MessageType = "TASK_ASSIGNED" | "TASK_RESULT" | "STATUS_CHANGED" | "ERROR" | "PROGRESS";
 
 /** Sender/recipient: an agent id, or ORCHESTRATOR. */
 export type Address = string;

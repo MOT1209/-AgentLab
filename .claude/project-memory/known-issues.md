@@ -20,3 +20,6 @@
 - No cost cap: maxSteps/timeout bound a run, but tokens/cost are only reported in telemetry — MEDIUM — open
 - No back-off between LLM calls and no concurrency limit across the 12 MAIN agents (rate limits untested) — LOW — open
 - uiautomator dump can fail while an animation runs or on secure screens (FLAG_SECURE); the agent then sees "ui: unavailable" — LOW — open
+- UI real-device mode (device list, key entry, run) has never been exercised against real adb or a live LLM — HIGH — open
+- UI is single-user, single-run, in-memory: refresh keeps the run (server side) but a server restart loses it; no auth beyond the launch token — LOW — open
+- UI polls /api/state once a second and resends all events; fine for <=1000 events, wasteful beyond — LOW — open

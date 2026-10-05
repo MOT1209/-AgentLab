@@ -36,3 +36,6 @@ Format: date — decision — reason
 - Findings are split: VERIFIED (system-detected crash markers) vs AI_OBSERVATION. Only VERIFIED MEDIUM+ turns the platform TaskStatus into FAILED.
 - Device was extended with optional swipe/pressKey/ui/clearLogs; capabilities swipe and press_key added; inspect_ui is now implemented.
 - The exploration timer is NOT unref'd (found by tests: an unref'd timer lets the process exit with the run pending).
+- UI: zero-dependency local server (node:http) + one self-contained page. Loopback only, Host-header check, random per-start token on every API call (header; query only for GET images/report), JSON-only POSTs, nonce CSP, textContent only (LLM/app text is untrusted). API key kept in process memory via a SecretResolver, never persisted or returned.
+- Live progress is a PROGRESS message type on the existing MessageBus, emitted by handlers through ctx.report. No second event system.
+- Demo mode uses MockDevice with a generated valid PNG and a scripted MockProvider; it must always be labelled as a demo.

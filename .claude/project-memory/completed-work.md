@@ -6,3 +6,4 @@
 - Phase 3: device runtime (registry, pool/leases, manager, assignments, health, discovery), agents integrated per-MAIN device with exclusive leasing; 52 tests pass. Removed known issue: no device lock.
 - Phase 3.5: provider system (Anthropic SDK + OpenAI-compatible + mock), env-var-only secrets, per-agent routing, ctx.llm; 65 tests pass.
 - Phase 4: Exploration Agent (MAIN-05-A): typed action model + validator + safe executor, bounded LLM loop (maxSteps/timeout/cancel), evidence + findings (verified vs AI), Device swipe/pressKey/ui/clearLogs (+AdbDevice), provider jsonSchema/signal, MockProvider scripting; 98 tests pass.
+- UI: local web UI (npm run ui), AR/EN, demo + real modes, live steps/screenshots/findings, cancel, report download; server security tests; 108 tests pass; demo flow checked in headless Chromium.

@@ -13,3 +13,7 @@ Only MAIN-01-B (smoke) and MAIN-05-A (explore) have behavior; the other 22 sub-a
 - Edge Case Agent (MAIN-05-B) reusing runExploration with a different system prompt/strategy
 - Persistence of runs/evidence; report output (JSON/Markdown)
 - Dynamic device allocation if fewer than 12 devices
+
+## UI (added after Phase 4)
+`npm run ui` — local web UI (src/ui/): demo mode verified in headless Chromium; real mode untested on hardware.
+Progress reaches the UI through PROGRESS messages on the bus (HandlerContext.report). 108 tests pass.

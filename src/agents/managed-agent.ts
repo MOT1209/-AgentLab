@@ -25,6 +25,8 @@ export interface HandlerContext {
   runtime: RuntimeContext;
   /** Cancellation signal from the dispatcher, if any. */
   signal?: AbortSignal;
+  /** Publishes a live progress event (PROGRESS message on the bus) for UIs. Never required for correctness. */
+  report: (event: Record<string, unknown>) => void;
   /** The LLM provider routed to this agent (its own override, its MAIN's, or the default). */
   llm?: LlmProvider;
   definition: AgentDefinition;

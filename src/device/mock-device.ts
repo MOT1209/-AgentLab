@@ -41,9 +41,11 @@ export class MockDevice implements Device {
     this.guard("stop");
     this.running.delete(pkg);
   }
+  /** Optional image source for demos. Default is a small placeholder (not a valid image). */
+  screenshotFn?: () => Buffer;
   async screenshot(): Promise<Buffer> {
     this.guard("screenshot");
-    return Buffer.from("mock-png");
+    return this.screenshotFn ? this.screenshotFn() : Buffer.from("mock-png");
   }
   async tap(x: number, y: number): Promise<void> {
     this.guard("tap");
