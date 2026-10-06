@@ -30,9 +30,8 @@
 - Goal loop has no independent verification or replanning; the exploration loop only maps onto it — MEDIUM — open
 - No Agent Run record (skills, tools, LLM calls, tokens, cost, evidence in one place); only ExplorationTelemetry and the message bus — LOW — open
 - Profile limits (steps, LLM calls, tokens, time) are enforced only inside the exploration loop; the smoke handler is a fixed sequence and Agent.run still has no per-task timeout — LOW — open
-- src/api/ has no auth/authz: any caller that can reach the port can dispatch tests, read provider status, and stream the full message bus. Fine for local dev only — MEDIUM — open
-- Control Center UI has only been exercised in headless Chromium against mocks; no real device/adb/LLM, no mobile-browser pass, and POST /providers lets any caller who can reach the port register a provider that reads any env var NAME present on the server (including unrelated secrets) — MEDIUM — open (needs auth or an allowlist before any non-local use)
-- No request body size limit on POST routes (readJsonBody buffers the whole body) — LOW — open
+- src/api/ now requires a random token, checks Host, accepts only JSON, caps bodies at 64KB, binds 127.0.0.1 (audit S-1/S-2/S-3 fixed). Still single-user, no per-user authz — LOW — open
+- Control Center UI has only been exercised in headless Chromium against mocks; no real device/adb/LLM, no mobile-browser pass, — MEDIUM — open. POST /providers env names are now restricted to *API_KEY/*_KEY/*_TOKEN and keyed providers must use https or localhost
 - GET /events has no reconnection/backlog support: a client that connects after a run started misses earlier messages (bus.history() exists but isn't replayed on connect) — LOW — open
 - UI real-device mode (device list, key entry, run) has never been exercised against real adb or a live LLM — HIGH — open
 - UI is single-user, single-run, in-memory: refresh keeps the run (server side) but a server restart loses it; no auth beyond the launch token — LOW — open

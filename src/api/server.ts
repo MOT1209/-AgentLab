@@ -1,3 +1,4 @@
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer, IncomingMessage, ServerResponse, Server } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
@@ -25,11 +26,47 @@ function json(status: number, body: unknown): JsonResponse {
   return { status, body };
 }
 
+const MAX_BODY = 64 * 1024;
+
+/** An error whose message is safe to return to the caller, with an HTTP status. */
+class HttpError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
-  for await (const chunk of req) chunks.push(chunk as Buffer);
+  let size = 0;
+  for await (const chunk of req) {
+    size += (chunk as Buffer).length;
+    if (size > MAX_BODY) throw new HttpError(413, "request body too large");
+    chunks.push(chunk as Buffer);
+  }
   if (chunks.length === 0) return {};
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+}
+
+function safeEqual(a: string, b: string): boolean {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
+}
+
+/** Env var names a provider may read its key from. Keeps POST /providers from reading unrelated secrets. */
+const KEY_ENV_NAME = /^[A-Z][A-Z0-9_]*(API_KEY|_KEY|_TOKEN)$/;
+
+/** A key may only be sent over https, or to this machine. */
+function isSafeKeyTarget(baseUrl: string): boolean {
+  try {
+    const u = new URL(baseUrl);
+    return u.protocol === "https:" || ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname);
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -39,6 +76,11 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
  * would. In-memory only; no persistence (see known-issues.md).
  */
 export interface ApiOptions {
+  /**
+   * Secret required on every API call (header `x-agentlab-token`; `?t=` for GET /events, which
+   * EventSource cannot add headers to). Generated randomly if omitted; read it from `server.apiToken`.
+   */
+  token?: string;
   webRoot?: string;
   /** adb executable to use for discovery and for the devices it finds. Default "adb" (must be on PATH). */
   adbPath?: string;
@@ -48,7 +90,8 @@ export interface ApiOptions {
   createDevice?: (d: DiscoveredDevice) => Device;
 }
 
-export function createApiServer(runtime: AgentLabRuntime, opts: ApiOptions = {}): Server {
+export function createApiServer(runtime: AgentLabRuntime, opts: ApiOptions = {}): Server & { apiToken: string } {
+  const token = opts.token ?? randomBytes(24).toString("hex");
   const adbPath = opts.adbPath ?? "adb";
   const tasks = new TaskStore();
   const webRoot = opts.webRoot ? resolve(opts.webRoot) : undefined;
@@ -56,14 +99,19 @@ export function createApiServer(runtime: AgentLabRuntime, opts: ApiOptions = {})
   // Serves the static Control Center. Anything that resolves outside webRoot is a 404.
   async function serveStatic(path: string, res: ServerResponse): Promise<boolean> {
     if (!webRoot) return false;
-    const rel = path === "/" ? "index.html" : decodeURIComponent(path).replace(/^\/+/, "");
+    let rel: string;
+    try {
+      rel = path === "/" ? "index.html" : decodeURIComponent(path).replace(/^\/+/, "");
+    } catch {
+      return false;
+    }
     const file = resolve(webRoot, rel);
     if (file !== webRoot && !file.startsWith(webRoot + sep)) return false;
     const type = MIME[extname(file)];
     if (!type) return false;
     try {
       const data = await readFile(file);
-      res.writeHead(200, { "content-type": type, "cache-control": "no-cache" });
+      res.writeHead(200, { "content-type": type, "cache-control": "no-store", "x-content-type-options": "nosniff" });
       res.end(data);
       return true;
     } catch {
@@ -142,6 +190,13 @@ export function createApiServer(runtime: AgentLabRuntime, opts: ApiOptions = {})
   async function handleProviderAdd(req: IncomingMessage): Promise<JsonResponse> {
     if (!runtime.providers) return json(404, { error: "no providers configured" });
     const body = await readJsonBody(req);
+    const cfg = body as { auth?: { type?: unknown; env?: unknown }; baseUrl?: unknown } | null;
+    if (cfg?.auth?.type === "api_key" && typeof cfg.auth.env === "string" && !KEY_ENV_NAME.test(cfg.auth.env)) {
+      return json(400, { error: "auth.env must be a key variable name ending in API_KEY, _KEY or _TOKEN" });
+    }
+    if (cfg?.auth?.type === "api_key" && typeof cfg.baseUrl === "string" && !isSafeKeyTarget(cfg.baseUrl)) {
+      return json(400, { error: "a provider with an API key must use an https baseUrl (or localhost)" });
+    }
     try {
       const provider = runtime.providers.add(body);
       return json(201, { id: provider.id, kind: provider.kind, model: provider.model });
@@ -178,12 +233,26 @@ export function createApiServer(runtime: AgentLabRuntime, opts: ApiOptions = {})
     res.req.on("close", unsubscribe);
   }
 
-  return createServer((req, res) => {
+  const server = createServer((req, res) => {
     void (async () => {
       try {
+        const addr = server.address();
+        const port = typeof addr === "object" && addr ? addr.port : 0;
+        const host = req.headers.host ?? "";
+        if (host !== `127.0.0.1:${port}` && host !== `localhost:${port}`) return send(res, json(403, { error: "forbidden host" }));
+
         const url = new URL(req.url ?? "/", "http://localhost");
         const path = url.pathname;
         const method = req.method ?? "GET";
+
+        // Static files are public (no secrets); every API route needs the token.
+        if (method === "GET" && !(path === "/events" || path.startsWith("/providers") || path.startsWith("/devices") || path.startsWith("/tests")) && (await serveStatic(path, res))) return;
+        const supplied = (req.headers["x-agentlab-token"] as string | undefined) ?? (method === "GET" ? (url.searchParams.get("t") ?? "") : "");
+        if (!supplied || !safeEqual(supplied, token)) return send(res, json(401, { error: "missing or wrong token" }));
+        // A cross-site form post cannot send this content type without a CORS preflight.
+        if (method !== "GET" && !(req.headers["content-type"] ?? "").includes("application/json")) {
+          return send(res, json(415, { error: "Content-Type must be application/json" }));
+        }
 
         if (method === "GET" && path === "/providers") {
           return send(res, json(200, runtime.providers?.describe() ?? []));
@@ -218,18 +287,22 @@ export function createApiServer(runtime: AgentLabRuntime, opts: ApiOptions = {})
         if (method === "GET" && path === "/events") {
           return handleEvents(res);
         }
-        if (method === "GET" && (await serveStatic(path, res))) return;
         send(res, json(404, { error: `no route for ${method} ${path}` }));
       } catch (e) {
+        if (e instanceof HttpError) {
+          if (e.status === 413) res.setHeader("connection", "close");
+          return send(res, json(e.status, { error: e.message }));
+        }
         if (e instanceof SyntaxError) return send(res, json(400, { error: "request body is not valid JSON" }));
         send(res, json(500, { error: e instanceof Error ? e.message : String(e) }));
       }
     })();
   });
+  return Object.assign(server, { apiToken: token });
 }
 
 function send(res: ServerResponse, r: JsonResponse): void {
   const body = JSON.stringify(r.body);
-  res.writeHead(r.status, { "content-type": "application/json" });
+  res.writeHead(r.status, { "content-type": "application/json", "cache-control": "no-store", "x-content-type-options": "nosniff" });
   res.end(body);
 }

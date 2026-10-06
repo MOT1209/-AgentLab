@@ -32,8 +32,10 @@ async function main(): Promise<void> {
 
   const runtime = initializeAgentLab({ deviceManager: devices, providers });
   const port = Number(process.env.PORT ?? 4000);
-  createApiServer(runtime, { webRoot: process.env.WEB_ROOT ?? "web", adbPath }).listen(port, () => {
-    console.log(`[api] listening on http://localhost:${port}`);
+  const server = createApiServer(runtime, { webRoot: process.env.WEB_ROOT ?? "web", adbPath, ...(process.env.AGENTLAB_API_TOKEN ? { token: process.env.AGENTLAB_API_TOKEN } : {}) });
+  // Loopback only: the API can start tests on devices and uses provider keys.
+  server.listen(port, "127.0.0.1", () => {
+    console.log(`[api] open http://127.0.0.1:${port}/?token=${server.apiToken}`);
   });
 }
 

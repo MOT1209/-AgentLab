@@ -100,7 +100,7 @@ The UI is Arabic or English (switch at the top). Safety properties: it listens o
 
 ### Control Center (web UI)
 
-`npm run dev:api`, then open `http://localhost:4000` (Arabic/English toggle). Options are environment
+`npm run dev:api`, then open the link it prints (`http://127.0.0.1:4000/?token=...`; Arabic/English toggle). The API listens on loopback only and every call needs that random token (set your own with `AGENTLAB_API_TOKEN`). Options are environment
 variables set in the same terminal before starting: `PORT`, `PROVIDERS_FILE`, `ADB_PATH`.
 API keys are never typed into the UI: export the key (for example `GROQ_API_KEY`) first, then add the
 provider and enter only the variable's name.
@@ -115,7 +115,7 @@ npm run dev:api
 ```
 
 Check `adb devices` in that terminal first. A phone listed as `unauthorized` is waiting for you to accept the
-"Allow USB debugging" prompt on its screen. The API has no authentication: use it on localhost only.
+"Allow USB debugging" prompt on its screen. Provider keys must come from env vars named `*API_KEY`, `*_KEY` or `*_TOKEN`, and a keyed provider must use https (or localhost).
 
 ### 1. Try it with no device and no API key
 

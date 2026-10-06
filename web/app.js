@@ -22,10 +22,26 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 
+// The launch link carries the API token (?token=...). Keep it for this tab only and drop it from the address bar.
+const TOKEN = (() => {
+  try {
+    const fromUrl = new URLSearchParams(location.search).get("token");
+    if (fromUrl) {
+      sessionStorage.setItem("agentlab-token", fromUrl);
+      history.replaceState(null, "", location.pathname);
+      return fromUrl;
+    }
+    return sessionStorage.getItem("agentlab-token") ?? "";
+  } catch {
+    return "";
+  }
+})();
+
 async function api(method, path, body) {
   const res = await fetch(path, {
     method,
-    ...(body !== undefined ? { headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {}),
+    headers: { "x-agentlab-token": TOKEN, ...(body !== undefined || method !== "GET" ? { "content-type": "application/json" } : {}) },
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
   const data = await res.json().catch(() => ({}));
   return { ok: res.ok, status: res.status, data };
@@ -189,7 +205,7 @@ let poller;
 
 function ensureEvents(onEvent) {
   if (source) return;
-  source = new EventSource("/events");
+  source = new EventSource(`/events?t=${encodeURIComponent(TOKEN)}`);
   source.onmessage = (e) => {
     try {
       events.push(JSON.parse(e.data));
