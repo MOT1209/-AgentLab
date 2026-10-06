@@ -357,5 +357,5 @@ AgentLab is for testing applications and games you own or are authorized to test
 
 ## License
 
-No license has been chosen yet; until one is added, all rights are reserved by the repository owner.
+MIT, see [LICENSE](LICENSE).
 "# -AgentLab" 
