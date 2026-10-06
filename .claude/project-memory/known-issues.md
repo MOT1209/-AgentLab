@@ -41,3 +41,5 @@
 - Health check allows a non-PNG screenshot only for MOCK devices; a real device returning odd screencap output is rejected — LOW — open
 - Simulated adb accepts the same commands the code currently sends; if the code changes its commands, update test/support/fake-adb.ts — LOW — open
 - No linter is configured in this project (only tsc strict) — LOW — open
+- P1 fixes (unproven on real hardware): adb install timeout is 10 min (others 30s); only connection-loss errors set a device to ERROR; TYPE single-quotes ASCII (symbols kept) and non-ASCII needs the ADBKeyboard app (fails loudly otherwise, ADBKeyboard path never run on a device); smoke validates its payload, clears logs, uses package-scoped detectCrash and always stops the app — LOW — open until a real run
+- P1 still open: merge the two web UIs (src/ui vs src/api+web); benchmark app with planted bugs vs adb monkey (needs a real device) — MEDIUM — open

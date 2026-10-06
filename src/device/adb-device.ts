@@ -7,11 +7,28 @@ const run = promisify(execFile);
 const PKG = /^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$/;
 const ACTIVITY = /^\.?[A-Za-z][A-Za-z0-9_$]*(\.[A-Za-z][A-Za-z0-9_$]*)*$/;
 
+/** Per-command timeouts. Installing a large app or game can take minutes; everything else should be quick. */
+export interface AdbTimeouts {
+  defaultMs: number;
+  installMs: number;
+}
+const DEFAULT_TIMEOUTS: AdbTimeouts = { defaultMs: 30_000, installMs: 10 * 60_000 };
+
+/** adb says these when the device itself is gone, as opposed to one command failing. */
+const CONNECTION_LOST = /device .*not found|no devices|offline|unauthorized|cannot connect|device disconnected|closed/i;
+
+/** The ADBKeyboard IME (github.com/senzhk/ADBKeyBoard) is what makes non-ASCII input possible; stock `input text` is ASCII only. */
+const ADB_KEYBOARD_IME = "com.android.adbkeyboard/.AdbIME";
+
 /** ADB adapter. Uses execFile (no shell) so arguments cannot inject commands. */
 export class AdbDevice implements Device {
   private lastState: DeviceState = "CONNECTING";
 
-  constructor(readonly id: string, private readonly adbPath = "adb") {}
+  private readonly timeouts: AdbTimeouts;
+
+  constructor(readonly id: string, private readonly adbPath = "adb", timeouts: Partial<AdbTimeouts> = {}) {
+    this.timeouts = { ...DEFAULT_TIMEOUTS, ...timeouts };
+  }
 
   get source(): DeviceSource {
     return adbSourceOf(this.id);
@@ -21,17 +38,18 @@ export class AdbDevice implements Device {
     return this.lastState;
   }
 
-  private async adb(args: string[], opts: { binary?: boolean } = {}): Promise<string | Buffer> {
+  private async adb(args: string[], opts: { binary?: boolean; timeoutMs?: number } = {}): Promise<string | Buffer> {
     try {
       const { stdout } = await run(this.adbPath, ["-s", this.id, ...args], {
-        timeout: 30_000,
+        timeout: opts.timeoutMs ?? this.timeouts.defaultMs,
         maxBuffer: 32 * 1024 * 1024,
         encoding: opts.binary ? "buffer" : "utf8",
       });
       this.lastState = "ONLINE";
       return stdout;
     } catch (e) {
-      this.lastState = "ERROR";
+      // One failed command (a timeout, uiautomator during an animation) does not mean the device is gone.
+      if (CONNECTION_LOST.test(String((e as { stderr?: unknown }).stderr ?? "") + (e as Error).message)) this.lastState = "ERROR";
       throw new DeviceError(`adb ${args[0]} failed: ${(e as Error).message}`, this.id);
     }
   }
@@ -46,7 +64,9 @@ export class AdbDevice implements Device {
     return { id: this.id, model: await prop("ro.product.model"), androidVersion: await prop("ro.build.version.release") };
   }
   async install(apkPath: string): Promise<void> {
-    await this.adb(["install", "-r", apkPath]);
+    // A path starting with "-" would be read by adb as an option.
+    if (apkPath.startsWith("-") || apkPath.length === 0) throw new DeviceError(`invalid apk path: ${apkPath}`, this.id);
+    await this.adb(["install", "-r", apkPath], { timeoutMs: this.timeouts.installMs });
   }
   async launch(p: string, activity?: string): Promise<void> {
     if (activity !== undefined) {
@@ -66,9 +86,21 @@ export class AdbDevice implements Device {
     await this.adb(["shell", "input", "tap", String(Math.trunc(x)), String(Math.trunc(y))]);
   }
   async type(text: string): Promise<void> {
-    // adb input text needs %s for spaces; strip shell-significant chars.
-    const safe = text.replace(/[^A-Za-z0-9 @._-]/g, "").replace(/ /g, "%s");
-    await this.adb(["shell", "input", "text", safe]);
+    if (/[^\x20-\x7e]/.test(text)) return this.typeUnicode(text);
+    // The device shell re-parses the arguments, so the text is single-quoted (a literal ' becomes '\''); `%s` is a space for `input text`.
+    const quoted = `'${text.replace(/%/g, "").replace(/ /g, "%s").replace(/'/g, "'\\''")}'`;
+    await this.adb(["shell", "input", "text", quoted]);
+  }
+
+  /** Non-ASCII text (Arabic, umlauts, emoji) needs the ADBKeyboard IME. Fails loudly instead of dropping characters. */
+  private async typeUnicode(text: string): Promise<void> {
+    const imes = String(await this.adb(["shell", "ime", "list", "-s"]));
+    if (!imes.includes(ADB_KEYBOARD_IME)) {
+      throw new DeviceError("typing non-ASCII text needs the ADBKeyboard app installed on the device (stock `input text` is ASCII only)", this.id);
+    }
+    await this.adb(["shell", "ime", "set", ADB_KEYBOARD_IME]);
+    const b64 = Buffer.from(text, "utf8").toString("base64");
+    await this.adb(["shell", "am", "broadcast", "-a", "ADB_INPUT_B64", "--es", "msg", b64]);
   }
   async swipe(x1: number, y1: number, x2: number, y2: number, durationMs = 300): Promise<void> {
     const n = [x1, y1, x2, y2, durationMs].map((v) => String(Math.trunc(Number(v))));

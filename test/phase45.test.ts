@@ -263,8 +263,9 @@ test("AdbDevice: activity injection is rejected and typed text cannot become a s
   const calls = fake.calls();
   assert.ok(calls.includes("shell am start -n com.fake.app/.Main"));
   assert.ok(calls.some((c) => c.startsWith("shell monkey -p com.fake.app")));
-  assert.ok(calls.includes("shell input text hi%sreboot%sid"), calls.join("|")); // metacharacters stripped
-  assert.ok(!calls.some((c) => /rm -rf|reboot \$/.test(c)));
+  // the text is single-quoted, so the device shell sees one literal word list, never a command
+  assert.ok(calls.includes("shell input text 'hi;%sreboot%s$(id)'"), calls.join("|"));
+  assert.ok(!calls.some((c) => /rm -rf/.test(c)));
 });
 
 // ---------- simulated adb: real AdbDiscovery/AdbDevice process plumbing, fake device ----------
