@@ -4,3 +4,5 @@ dist
 *.log
 providers.local.json
 out/
+*.stackdump
+review-report.html
