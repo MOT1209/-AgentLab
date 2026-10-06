@@ -1,0 +1,273 @@
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AgentLab — تقرير الفحص / Prüfbericht</title><style>
+:root{--bg:#fff;--fg:#1c2330;--mut:#5b6678;--card:#f4f6fa;--bd:#d9dee8;--ac:#1d4ed8;--ok:#15803d;--bad:#b91c1c;--warn:#b45309}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0f141c;--fg:#e6eaf2;--mut:#9aa6b8;--card:#171e29;--bd:#2a3342;--ac:#7aa2ff;--ok:#4ade80;--bad:#f87171;--warn:#fbbf24}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 system-ui,"Segoe UI",Tahoma,"Noto Naskh Arabic",sans-serif}
+main{max-width:1000px;margin:0 auto;padding:24px 16px 56px}main+main{border-top:6px solid var(--ac);margin-top:24px}
+h1{font-size:1.9rem;margin:.2em 0}h2{font-size:1.3rem;margin-top:2em;padding-bottom:.3em;border-bottom:2px solid var(--bd)}h3{font-size:1.05rem;margin-top:1.4em}
+.sub{color:var(--mut);margin:0}.meta{color:var(--mut);font-size:.85rem}
+nav{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px 14px;font-size:.9rem;line-height:2}nav a{color:var(--ac);text-decoration:none;white-space:nowrap}
+.tw{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:.92rem;margin:.8em 0}th,td{border:1px solid var(--bd);padding:8px 10px;vertical-align:top;text-align:start}th{background:var(--card)}
+code{background:var(--card);border:1px solid var(--bd);border-radius:4px;padding:0 4px;font-size:.88em;direction:ltr;unicode-bidi:embed}pre{background:var(--card);border:1px solid var(--bd);padding:12px;border-radius:8px;overflow-x:auto;direction:ltr;text-align:left}
+.verdict{background:var(--card);border-inline-start:5px solid var(--warn);padding:12px 16px;border-radius:6px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:14px 0}.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px;font-size:.85rem;color:var(--mut)}.n{display:block;font-size:1.7rem;font-weight:700}.n.ok{color:var(--ok)}.n.bad{color:var(--bad)}.n.warn{color:var(--warn)}
+.note{color:var(--mut);font-size:.9rem;background:var(--card);padding:8px 12px;border-radius:6px}
+.sev{display:inline-block;padding:1px 9px;border-radius:99px;font-size:.78rem;font-weight:700;color:#fff}.CRITICAL{background:#991b1b}.HIGH{background:#c2410c}.MEDIUM{background:#a16207}.LOW{background:#475569}
+.st{font-size:.78rem;font-weight:600}.st.REPRO{color:var(--bad)}.st.CODE{color:var(--mut)}.file{color:var(--mut);direction:ltr;unicode-bidi:embed;display:inline-block}
+td.p0{color:var(--bad);font-weight:700}td.p1{color:var(--warn);font-weight:700}td.p2{color:var(--ac);font-weight:700}td.p3{color:var(--mut);font-weight:700}
+.ft td:first-child{white-space:nowrap}
+@media print{nav{display:none}main+main{page-break-before:always}}
+</style></head><body><main lang="ar" dir="rtl" id="ar"><header><h1>تقرير فحص مشروع AgentLab</h1><p class="sub">فحص تقني وأمني وتجاري شامل — مبني على اختبار فعلي للشيفرة</p><p class="meta">AgentLab · 2026-10-06 · branch <code>claude/busy-ramanujan-8dsoww</code> @ cd74f7e</p></header><nav><b>المحتويات:</b> <a href="#ar-summary">1. الخلاصة التنفيذية</a> · <a href="#ar-facts">2. ما هو المشروع (حقائق)</a> · <a href="#ar-tests">3. نتائج الاختبار الفعلي</a> · <a href="#ar-findings">4. المشاكل والثغرات (مرتبة حسب الخطورة)</a> · <a href="#ar-arch">5. تقييم المعمارية</a> · <a href="#ar-biz">6. التقييم التجاري (رأي وتقدير، وليس حقائق)</a> · <a href="#ar-plan">7. خطة العمل المقترحة (بالأولوية)</a> · <a href="#ar-ideas">8. اقتراحات تطوير وإضافات</a> · <a href="#ar-risks">9. مصفوفة المخاطر</a> · <a href="#ar-appendix">10. ملحق: كيف أعدتَ الفحص</a></nav><section id="ar-summary"><h2>1. الخلاصة التنفيذية</h2>
+<div class="verdict"><b>الحكم (رأيي):</b> هندسة نظيفة وتنفيذ جيد لنموذج أولي، لكن <b>المنتج لم يُثبت بعد أنه يعمل على جهاز حقيقي ولا مع نموذج لغوي حقيقي</b>. أكبر خطر الآن ليس تقنياً بل تجاري: ما تم بناؤه (36 وكيلاً، منها 2 فقط يعمل) يسبق ما تم إثباته (صفر تشغيلات حقيقية).</div>
+<div class="cards">
+<div class="card"><span class="n ok">182</span>اختبار — 180 ناجح، 0 فاشل، 2 متخطّى</div>
+<div class="card"><span class="n ok">97.2%</span>تغطية أسطر (فروع 90%)</div>
+<div class="card"><span class="n ok">0</span>ثغرات في الاعتماديات (npm audit)</div>
+<div class="card"><span class="n bad">1</span>ثغرة حرجة مُعاد إنتاجها (S-1)</div>
+<div class="card"><span class="n warn">0</span>تشغيلات على جهاز/نموذج حقيقي</div>
+</div>
+<h3>أهم 5 أشياء يجب فعلها</h3>
+<ol><li><b>أغلق S-1/S-2 اليوم</b> (ساعات): رمز + فحص Host + JSON فقط على <code>src/api</code>، أو احذف هذا الخادم.</li>
+<li><b>شغّل على جهاز/محاكي حقيقي واحد</b> مع نموذج حقيقي (تكلفة: بضعة دولارات). كل ما عداه تخمين حتى يحدث هذا.</li>
+<li><b>أنشئ تطبيقاً تجريبياً بأخطاء معروفة</b> وقِس: كم خطأ وجد الوكيل، وبأي تكلفة، مقارنةً بـ <code>adb shell monkey</code> المجاني. إن لم يتفوق بوضوح فلا قيمة تجارية.</li>
+<li><b>أضف CI</b> (نصف ساعة) و<b>ملف ترخيص</b>.</li>
+<li><b>أوقف إضافة وكلاء</b>. اجعل وكيلين يعملان ممتازاً قبل بناء الـ 22 الباقين.</li></ol></section>
+<section id="ar-facts"><h2>2. ما هو المشروع (حقائق)</h2>
+<p>منصة اختبار تطبيقات وألعاب أندرويد بالذكاء الاصطناعي. هرمية ثابتة: <b>12 وكيلاً رئيسياً + 24 فرعياً</b> (36). لغة TypeScript صارمة على Node 22، اعتماد تشغيل واحد فقط (<code>@anthropic-ai/sdk</code>)، اختبارات <code>node:test</code>. حجم الشيفرة نحو 10.3 ألف سطر (مصدر + اختبارات + واجهة).</p>
+<table><thead><tr><th>المكوّن</th><th>المسار</th><th>الحالة (حسب README وما تحققتُ منه)</th></tr></thead><tbody>
+<tr><td>إطار الوكلاء والمنسّق</td><td>src/agents, src/orchestrator.ts</td><td>مبني ومختبر (وهمي)</td></tr>
+<tr><td>إدارة الأجهزة (leases, health, discovery)</td><td>src/runtime</td><td>مبني ومختبر (وهمي + adb محاكى)</td></tr>
+<tr><td>مزوّدو LLM (Anthropic, OpenAI-compatible, Mock)</td><td>src/providers</td><td>مختبر بـ fakes فقط — لم تُجرَ أي مكالمة حقيقية</td></tr>
+<tr><td>AdbDevice</td><td>src/device</td><td>لم يُشغَّل على جهاز حقيقي أبداً</td></tr>
+<tr><td>وكيل الاستكشاف MAIN-05-A</td><td>src/agents/exploration</td><td>حلقة observe→decide→validate→execute؛ لم يعمل مع جهاز/LLM حقيقي</td></tr>
+<tr><td>وكيل Smoke MAIN-01-B</td><td>src/agents/behaviors</td><td>يعمل وهمياً؛ انظر S-5</td></tr>
+<tr><td>22 وكيلاً فرعياً</td><td>—</td><td>مسجّلون بلا سلوك → يعيدون BLOCKED</td></tr>
+<tr><td>نظام المهارات والصلاحيات</td><td>src/skills</td><td>20 مهارة، 36 ملفاً شخصياً (profiles)، التحقق ناجح</td></tr>
+<tr><td>واجهة محلية (token) / Control Center</td><td>src/ui / src/api+web</td><td>الأولى آمنة؛ الثانية غير آمنة</td></tr>
+</tbody></table>
+<p class="note">صدق README عالٍ: يقول بوضوح «لم يُجرَّب على جهاز حقيقي» — وهذا ما وجدته فعلاً. هذه نقطة قوة في الثقة.</p></section>
+<section id="ar-tests"><h2>3. نتائج الاختبار الفعلي</h2>
+<p>ما نفّذتُه في بيئة السحابة (لا جهاز أندرويد، لا مفتاح LLM):</p>
+<table><thead><tr><th>الفحص</th><th>النتيجة</th></tr></thead><tbody>
+<tr><td><code>npm ci</code></td><td>نجح</td></tr>
+<tr><td><code>npm test</code> (tsc صارم + بناء + كل الاختبارات)</td><td>182 اختباراً: <b>180 ناجح، 0 فاشل، 2 متخطّى</b> (اختبار الجهاز الحقيقي واختبار adb الحقيقي) — زمن 2.3 ثانية</td></tr>
+<tr><td>تغطية الشيفرة</td><td>أسطر 97.21% · فروع 89.95% · دوال 96.09%</td></tr>
+<tr><td><code>npm run skills:validate</code></td><td>ok: 20 مهارة، 36 ملفاً شخصياً، الملفات المولَّدة متزامنة</td></tr>
+<tr><td><code>npm audit</code></td><td>0 ثغرات</td></tr>
+<tr><td><code>npm outdated</code></td><td>TypeScript 5.9.3 (الأحدث 7.x) و@types/node 22 — لا شيء عاجل</td></tr>
+<tr><td>فحص أمني نشط لـ <code>src/api</code></td><td>CSRF، Host مزيف، جسم كبير، path traversal، مسار مشوّه، تسريب المفتاح — النتائج في القسم 4</td></tr>
+</tbody></table>
+<h3>ما لم أختبره (وأقول بوضوح: لا أعرف)</h3>
+<ul><li>سلوك <code>adb</code> على جهاز أو محاكٍ حقيقي (لا أعرف إن كانت <code>uiautomator dump /dev/tty</code> تعمل على أجهزتك).</li>
+<li>جودة قرارات النموذج الحقيقي ولا تكلفتها ولا معدل اكتشاف الأخطاء.</li>
+<li>واجهة الويب في متصفح حقيقي (الاختبارات تغطي الخادم والمنطق؛ لم أفتح الصفحات بصرياً)، ولا الجوال، ولا Windows.</li>
+<li>الأداء تحت الحمل وتشغيل عدة أجهزة بالتوازي.</li></ul>
+<p class="note">ملاحظة منهجية: التغطية العالية تقيس أن الشيفرة نُفّذت، لا أنها صحيحة أمام عالم حقيقي. كل الاختبارات تعمل على محاكاة كتبها نفس المطوّر؛ الأخطاء من نوع «الجهاز يتصرف بشكل مختلف عن توقعي» لا تظهر فيها. <b>هذا أكبر فجوة في الجودة.</b></p></section>
+<section id="ar-findings"><h2>4. المشاكل والثغرات (مرتبة حسب الخطورة)</h2><p><span class="sev CRITICAL">حرج: 1</span> <span class="sev HIGH">عالٍ: 2</span> <span class="sev MEDIUM">متوسط: 6</span> <span class="sev LOW">منخفض: 3</span></p><div class="tw"><table class="ft"><thead><tr><th>المعرّف</th><th>الخطورة</th><th>الملاحظة</th><th>طريقة التحقق</th><th>الإصلاح المقترح</th></tr></thead><tbody><tr id="ar-S-1"><td><b>S-1</b></td><td><span class="sev CRITICAL">حرج</span></td><td><b>تسريب مفتاح API عبر CSRF: أي موقع ويب يستطيع سرقة مفاتيح البيئة</b><br>الخادم <code>npm run dev:api</code> بلا مصادقة، ولا يتحقق من <code>Content-Type</code> ولا من <code>Host</code>. صفحة ويب خبيثة تفتح في متصفحك تستطيع إرسال طلب POST بسيط (<code>text/plain</code>، بلا preflight) إلى <code>localhost:4000/providers</code> لتسجيل مزوّد بـ <code>baseUrl</code> يخص المهاجم و<code>auth.env = ANTHROPIC_API_KEY</code>، ثم POST إلى <code>/providers/x/test</code>. النتيجة: الخادم يرسل <code>Authorization: Bearer &lt;مفتاحك&gt;</code> إلى خادم المهاجم. <b>أعدتُ هذا فعلياً</b>: خادم تجريبي استقبل المفتاح كاملاً.<br><small class="file">src/api/server.ts</small></td><td><span class="st REPRO">أُعيد إنتاجه</span></td><td>(1) رمز عشوائي (token) إلزامي على كل مسار كما في <code>src/ui/server.ts</code>؛ (2) فحص <code>Host</code> وقبول <code>application/json</code> فقط؛ (3) قائمة بيضاء لأسماء متغيرات البيئة المسموحة (مثلاً <code>*_API_KEY</code> المعرّفة صراحةً) وربط كل اسم بمضيف <code>baseUrl</code> مسموح؛ (4) توحيد الخادمين (انظر A-1).</td></tr><tr id="ar-S-2"><td><b>S-2</b></td><td><span class="sev HIGH">عالٍ</span></td><td><b>CSRF / DNS-rebinding: أي موقع يستطيع إطلاق اختبارات على أجهزتك</b><br>طلب <code>POST /tests</code> بـ <code>text/plain</code> وبـ <code>Host: evil.example</code> أُعيد بـ <b>202 Accepted</b> وبدأ التنفيذ. أي صفحة ويب تستطيع تشغيل مهام على الأجهزة المتصلة وقراءة تيار <code>/events</code> (يحوي لقطات الشاشة والسجلات) عبر DNS rebinding.<br><small class="file">src/api/server.ts</small></td><td><span class="st REPRO">أُعيد إنتاجه</span></td><td>نفس إصلاحات S-1. أضف رؤوس <code>X-Content-Type-Options</code> و<code>Content-Security-Policy</code> و<code>Cache-Control: no-store</code> (الاستجابة الحالية بلا رؤوس أمان).</td></tr><tr id="ar-S-3"><td><b>S-3</b></td><td><span class="sev MEDIUM">متوسط</span></td><td><b>لا حدّ لحجم جسم الطلب</b><br><code>readJsonBody</code> يجمع الجسم كاملاً في الذاكرة. اختبرتُ 20 ميغابايت وتمت قراءتها كلها قبل الرفض. طلب كبير واحد يكفي لإنهاك الذاكرة. (الخادم <code>src/ui</code> يملك حدّ 64KB، فالحل موجود في المشروع نفسه).<br><small class="file">src/api/server.ts:27</small></td><td><span class="st CODE">من قراءة الشيفرة</span></td><td>انسخ نمط <code>readJson</code> من <code>src/ui/server.ts</code>: حدّ 64KB، رمز 413.</td></tr><tr id="ar-S-4"><td><b>S-4</b></td><td><span class="sev LOW">منخفض</span></td><td><b>مسار URL مشوّه يُرجع 500 بدل 400</b><br><code>GET /%E0%A4%A</code> يُرجع <code>500 {"error":"URI malformed"}</code> لأن <code>decodeURIComponent</code> يرمي استثناء. حماية مسارات الملفات (path traversal) تعمل: <code>/..%2f..%2fpackage.json</code> أُرجع 404 — هذه نقطة إيجابية.<br><small class="file">src/api/server.ts:55</small></td><td><span class="st REPRO">أُعيد إنتاجه</span></td><td>التقط الاستثناء وأرجع 400.</td></tr><tr id="ar-S-5"><td><b>S-5</b></td><td><span class="sev MEDIUM">متوسط</span></td><td><b>اختبار الدخان: بيانات غير مُتحقَّق منها، وكشف الانهيار ضعيف</b><br>(أ) <code>apkPath</code> يُمرَّر إلى <code>adb install -r</code> بلا تحقق؛ مسار يبدأ بـ <code>-</code> يُفسَّر كخيار لـ adb (حقن وسائط، لا حقن shell لأن execFile يُستخدم). (ب) لا يمسح logcat قبل التشغيل، فانهيار قديم من تطبيق آخر يسبب <b>FAILED كاذب</b>؛ والتعبير <code>/FATAL EXCEPTION|ANR in/</code> لا يفلتر حسب الحزمة، بينما وكيل الاستكشاف يستخدم <code>detectCrash</code> المحسَّن. (ج) لا يوجد <code>try/finally</code> — لو فشل <code>screenshot</code> لا يُوقف التطبيق.<br><small class="file">src/agents/behaviors/smoke.ts</small></td><td><span class="st CODE">من قراءة الشيفرة</span></td><td>تحقق من الحمولة (مسار مطلق، امتداد .apk، وجود الملف)؛ استدعِ <code>clearLogs</code> ثم <code>detectCrash(logs, packageName)</code>؛ ضع <code>stop</code> في <code>finally</code>.</td></tr><tr id="ar-R-1"><td><b>R-1</b></td><td><span class="sev HIGH">عالٍ</span></td><td><b>مهلة 30 ثانية لكل أوامر adb، بما فيها التثبيت</b><br><code>install</code> لتطبيق أو لعبة كبيرة (مئات الميغابايت) سيتجاوز 30 ثانية بسهولة ويفشل. هذا خطر مباشر لأن المنتج يستهدف الألعاب. لم أجرّبه على جهاز (لا جهاز هنا) — استنتاج من الشيفرة.<br><small class="file">src/device/adb-device.ts:27</small></td><td><span class="st CODE">من قراءة الشيفرة</span></td><td>مهلة لكل أمر: 30ث عامة، 5–10 دقائق للتثبيت، قابلة للضبط.</td></tr><tr id="ar-R-2"><td><b>R-2</b></td><td><span class="sev MEDIUM">متوسط</span></td><td><b>أي فشل في adb يضع الجهاز في حالة ERROR</b><br><code>this.lastState = "ERROR"</code> يُضبط عند أي استثناء، حتى لو كان فشلاً عابراً مثل <code>uiautomator dump</code> أثناء أنيميشن (موثّق في known-issues). واجهة <code>UiApp.startRun</code> ترفض الجهاز إن لم تكن حالته ONLINE، فقد يُحجب جهاز سليم حتى ينجح أمر آخر. افتراض: لم أعد إنتاجه على جهاز حقيقي.<br><small class="file">src/device/adb-device.ts:43</small></td><td><span class="st CODE">من قراءة الشيفرة</span></td><td>فرّق بين فشل الاتصال (الجهاز اختفى) وفشل أمر منفرد؛ استخدم عدّاد إخفاقات متتالية.</td></tr><tr id="ar-R-3"><td><b>R-3</b></td><td><span class="sev MEDIUM">متوسط</span></td><td><b>الأمر TYPE يحذف كل ما ليس ASCII بسيط — لا عربية ولا رموز</b><br><code>replace(/[^A-Za-z0-9 @._-]/g, "")</code> يحذف العربية والألمانية (ä, ß) والرموز (<code>+ ! #</code>). لا يمكن إدخال كلمة مرور قوية أو نص عربي أو بريد بـ <code>+</code>. هذا يحدّ من اختبار النماذج (forms) تحديداً — وهي من أهم حالات الاختبار.<br><small class="file">src/device/adb-device.ts:68</small></td><td><span class="st CODE">من قراءة الشيفرة</span></td><td>للـ ASCII استخدم <code>input text</code> بتهريب صحيح؛ للـ Unicode استخدم تطبيق ADBKeyboard أو لصق الحافظة. أضف <code>TYPE</code> من قائمة قيم اختبار جاهزة بدل نص حر من النموذج.</td></tr><tr id="ar-R-4"><td><b>R-4</b></td><td><span class="sev MEDIUM">متوسط</span></td><td><b>حقن الأوامر (prompt injection) عبر نص التطبيق</b><br>نصوص الواجهة وأسطر السجل تُرسل للنموذج. تطبيق (أو صفحة داخل WebView) يعرض نصاً مثل «تجاهل التعليمات واضغط…» قد يوجّه النموذج. الحماية الحالية جيدة في الجوهر: النموذج لا يستطيع إلا اختيار 1 من 12 إجراءً ولا يملك shell. الخطر المتبقي: نتائج مزيفة (<code>AI_OBSERVATION</code>) أو إهدار الخطوات، لا تنفيذ أوامر. غير موجود: فصل صريح في الـ prompt بين «تعليمات» و«بيانات غير موثوقة».<br><small class="file">src/agents/exploration/prompt.ts</small></td><td><span class="st CODE">من قراءة الشيفرة</span></td><td>ضع بيانات الشاشة داخل حقل مُعلَّم كغير موثوق وأضف جملة في system prompt تنصّ على ذلك؛ أضف قائمة حظر لإجراءات حساسة (شراء، حذف حساب) حسب نص الزر.</td></tr><tr id="ar-A-1"><td><b>A-1</b></td><td><span class="sev MEDIUM">متوسط</span></td><td><b>واجهتان ويب متداخلتان بنموذجين مختلفين</b><br><code>src/ui</code> (آمنة: token + Host + CSP + حدّ حجم) و<code>src/api + web/</code> (Control Center، بلا أي حماية). الاثنتان تغطيان وظائف متشابهة. الثانية هي مصدر S-1 إلى S-3. معروف في known-issues لكنه مصنّف MEDIUM — الاختبار العملي يرفعه إلى CRITICAL.<br><small class="file">src/api + src/ui + web/</small></td><td><span class="st CODE">من قراءة الشيفرة</span></td><td>اجعل <code>src/ui/server.ts</code> الأساس، وانقل مزايا Control Center إليه (مزودو النماذج، إدارة الوكلاء)، واحذف الباقي.</td></tr><tr id="ar-Q-1"><td><b>Q-1</b></td><td><span class="sev LOW">منخفض</span></td><td><b>لا CI، لا linter، لا ترخيص، لا Dockerfile، لا engines</b><br>لا يوجد <code>.github/workflows</code>. الاختبارات ممتازة لكنها لا تعمل تلقائياً. <code>package.json</code> بلا حقل <code>engines</code> رغم أن README يشترط Node 22 (يستخدم <code>AbortSignal.any</code>). لا ترخيص: كل الحقوق محفوظة تلقائياً، وهذا يمنع أي مساهم أو عميل مؤسسي.<br><small class="file">repo</small></td><td><span class="st CODE">من قراءة الشيفرة</span></td><td>GitHub Actions: <code>npm ci &amp;&amp; npm test &amp;&amp; npm run skills:validate</code>؛ أضف ESLint + Prettier؛ <code>"engines": {"node": "&gt;=22"}</code>؛ اختر ترخيصاً (أو أبقِه مغلقاً عن قصد).</td></tr><tr id="ar-Q-2"><td><b>Q-2</b></td><td><span class="sev LOW">منخفض</span></td><td><b>كل الحالة في الذاكرة وبلا حدود</b><br>لقطات الشاشة في <code>Map</code> بلا سقف للحجم (الأحداث محدودة بـ 1000 لكن اللقطات لا)؛ <code>TaskStore</code> يحتفظ بكل المهام للأبد؛ إعادة تشغيل الخادم تفقد كل شيء. مقبول للنموذج الأولي، ليس لأي استخدام فعلي.<br><small class="file">src/ui/app.ts, src/api/task-store.ts</small></td><td><span class="st CODE">من قراءة الشيفرة</span></td><td>SQLite لحفظ التشغيلات والأدلة؛ سقف لعدد/حجم اللقطات؛ تنظيف دوري.</td></tr></tbody></table></div></section>
+<section id="ar-arch"><h2>5. تقييم المعمارية</h2>
+<h3>نقاط القوة (حقائق مؤكدة من الشيفرة)</h3>
+<ul><li><b>حدّ أمان واضح للنموذج:</b> 12 إجراءً ثابتاً، <code>validateDecision</code> هو الطريق الوحيد من مخرجات النموذج إلى فعل؛ لا shell ولا adb خام؛ <code>execFile</code> بوسائط ثابتة؛ اسم الحزمة يُتحقق منه بتعبير نمطي.</li>
+<li><b>فصل الأدلة:</b> <code>VERIFIED</code> (من السجلات) مقابل <code>AI_OBSERVATION</code> (ادعاء النموذج) — قرار ناضج يمنع النموذج من إفشال اختبار بادعاء.</li>
+<li><b>الحدود الصلبة:</b> maxSteps وmaxLlmCalls وtimeout وإلغاء، ودلالات BLOCKED مقابل ERROR، وتأجير الأجهزة الحصري (lease).</li>
+<li><b>المفاتيح:</b> بالاسم فقط في البيئة، تُحجب من الأخطاء، ملفات الأدلة بصلاحية 0600، وفحص <code>detectCrash</code> يتجاهل انهيار التطبيقات الأخرى.</li>
+<li>اعتمادية واحدة + TypeScript صارم + <code>noUncheckedIndexedAccess</code>. توثيق ومذكرات مشروع (known-issues) صادقة.</li></ul>
+<h3>نقاط الضعف</h3>
+<ul><li><b>تصميم زائد (Overengineering) — رأيي:</b> 36 وكيلاً بتعريفات وصلاحيات لكل واحد، و20 مهارة، و36 ملفاً شخصياً، ونظام توليد SKILL.md — بينما وكيلان فقط لديهما سلوك. «الوكلاء» هنا بيانات أكثر منها قدرة. هذا تعقيد تدفع ثمنه في كل تغيير ولا يعطي قيمة للعميل.</li>
+<li><b>12 جهازاً ثابتة:</b> ربط MAIN→جهاز ثابت يتعارض مع واقع من لديه جهاز أو اثنان (معروف في known-issues).</li>
+<li><b>النموذج «أعمى»:</b> يرى شجرة الواجهة نصاً فقط؛ الألعاب وWebView وcanvas تكاد تكون غير مرئية — وهذا جمهور المنتج المعلن (الألعاب). تناقض استراتيجي، وليس مجرد ثغرة.</li>
+<li><b>لا استمرارية:</b> لا قاعدة بيانات، فلا تاريخ ولا مقارنة بين التشغيلات (أساس أي منتج اختبار).</li>
+<li><b>لا حدّ مالي:</b> الحدود بالخطوات والرموز فقط؛ تكلفة التشغيل غير معروفة.</li></ul></section>
+<section id="ar-biz"><h2>6. التقييم التجاري (رأي وتقدير، وليس حقائق)</h2>
+<p class="note">لم أتحقق من بيانات السوق الحالية عبر الإنترنت؛ الأحكام التالية من معرفتي العامة وتقديري. اعتبرها فرضيات تُختبر.</p>
+<table><thead><tr><th>المعيار</th><th>التقدير</th><th>المبرر / المخاطر</th></tr></thead><tbody>
+<tr><td>الطلب في السوق</td><td>متوسط–عالٍ</td><td>اختبار الجوال مكلف ومؤلم؛ لكن المشتري يريد <i>نتائج موثوقة</i> لا «وكلاء». الألعاب سوق أصعب وأضيق.</td></tr>
+<tr><td>المنافسة</td><td>عالية</td><td>أدوات ناضجة (Appium، Maestro، Firebase Test Lab، BrowserStack/LambdaTest وغيرها) وشركات ناشئة باختبار بالذكاء الاصطناعي. لا أعرف حالتها الراهنة بدقة. التمايز غير واضح بعد.</td></tr>
+<tr><td>صعوبة التقنية</td><td>عالية</td><td>الموثوقية (نتائج غير متقلبة) أصعب من القدرة. الحلقة بالنموذج غير حتمية: نفس التطبيق قد يعطي نتائج مختلفة.</td></tr>
+<tr><td>التكلفة</td><td>مجهولة</td><td>لم تُقَس. 15 خطوة × طلب LLM لكل خطوة × عدد التطبيقات × الأجهزة. قد تتفوق عليها أدوات حتمية رخيصة.</td></tr>
+<tr><td>وقت البناء للإثبات (MVP حقيقي)</td><td>2–4 أسابيع</td><td>جهاز + نموذج + تطبيق تجريبي + مقياس مقارنة. الأساس البرمجي موجود، الناقص هو الواقع.</td></tr>
+<tr><td>قابلية التوسع</td><td>ضعيفة حالياً</td><td>ذاكرة فقط، مستخدم واحد، جهاز واحد لكل تشغيل. السحابة تتطلب مزرعة أجهزة (تكلفة كبيرة) أو محاكيات.</td></tr>
+<tr><td>إمكانات الإيراد</td><td>ممكنة لكن غير مثبتة</td><td>اشتراك لكل تطبيق/شهر أو دفع لكل تشغيل. لا أستطيع تقدير رقم دون بيانات تكلفة وتجارب عملاء.</td></tr>
+</tbody></table>
+<h3>لماذا قد تفشل الخطة (قبل لماذا قد تنجح)</h3>
+<ol><li><b>القيمة غير مثبتة:</b> إن لم يجد الوكيل أخطاء أكثر من <code>monkey</code> المجاني بتكلفة معقولة، لا يوجد منتج.</li>
+<li><b>التقلب:</b> اختبار يعطي نتائج مختلفة كل مرة يفقد ثقة المطوّرين بسرعة (false positives أسوأ من false negatives).</li>
+<li><b>الألعاب:</b> دون رؤية بالصور (vision) الاستكشاف ضعيف؛ ومعه ترتفع التكلفة والخصوصية.</li>
+<li><b>الخصوصية:</b> إرسال نص الشاشة والسجلات لمزوّد خارجي قد يمنعه عملاء مؤسسيون.</li>
+<li><b>التشتت:</b> بناء 36 وكيلاً قبل حلقة واحدة مثبتة يستهلك الوقت والحماس.</li>
+<li><b>اعتماد على مزوّد واحد:</b> أسعار وسياسات النماذج تتغير؛ الحماية الجزئية موجودة (مزودون متعددون).</li></ol>
+<h3>أبسط مسار (الحل الأبسط أولاً)</h3>
+<p>وكيل واحد (الاستكشاف) + جهاز واحد + تقرير HTML/JSON + معيار مقارنة. بيع <i>«تقرير أخطاء خلال ساعة لتطبيقك بسعر ثابت»</i> كخدمة يدوية-آلية لأول 3–5 عملاء قبل بناء منصة. هذا يثبت الطلب بأقل تكلفة.</p></section>
+<section id="ar-plan"><h2>7. خطة العمل المقترحة (بالأولوية)</h2>
+<table><thead><tr><th>المرحلة</th><th>البند</th><th>الجهد</th><th>القيمة</th></tr></thead><tbody>
+<tr><td class="p0">P0 — الآن</td><td>إغلاق S-1/S-2/S-3 (token، Host، JSON فقط، حدّ الجسم، قائمة بيضاء للأسماء والمضيفات) أو حذف <code>src/api</code></td><td>2–6 ساعات</td><td>يزيل ثغرة حرجة</td></tr>
+<tr><td class="p0">P0</td><td>CI على GitHub Actions + <code>engines</code> + ترخيص</td><td>1 ساعة</td><td>يحمي الجودة</td></tr>
+<tr><td class="p0">P0</td><td>أول تشغيل حقيقي: <code>REAL_DEVICE_TEST=1 npm run test:real</code> ثم <code>npm run ui</code> على محاكي</td><td>نصف يوم</td><td>يحوّل التخمين إلى معرفة</td></tr>
+<tr><td class="p1">P1 — أسبوع</td><td>إصلاح R-1 (مهلة التثبيت) وR-2 (حالة ERROR) وR-3 (TYPE) وS-5 (smoke)</td><td>1–2 يوم</td><td>موثوقية على جهاز حقيقي</td></tr>
+<tr><td class="p1">P1</td><td>تطبيق تجريبي بأخطاء مزروعة + مقياس: أخطاء مكتشفة / دولار، مقابل <code>monkey</code></td><td>2–3 أيام</td><td>الدليل التجاري الأهم</td></tr>
+<tr><td class="p1">P1</td><td>دمج الواجهتين في واحدة (A-1)</td><td>2–3 أيام</td><td>تقليل سطح الهجوم والصيانة</td></tr>
+<tr><td class="p2">P2 — شهر</td><td>حفظ في SQLite: تشغيلات، أدلة، تكلفة؛ تقرير HTML قابل للمشاركة؛ سقف مالي لكل تشغيل (جدول أسعار يدوي)</td><td>1–2 أسبوع</td><td>بداية منتج</td></tr>
+<tr><td class="p2">P2</td><td>إدخال الرؤية (screenshots للنموذج) كخيار، مع حدّ تكلفة وإخفاء بيانات حساسة</td><td>1 أسبوع</td><td>يفتح الألعاب</td></tr>
+<tr><td class="p2">P2</td><td>تخفيف عدم الحتمية: إعادة تشغيل الانهيارات تلقائياً لتأكيدها، وإرفاق خطوات إعادة الإنتاج</td><td>1 أسبوع</td><td>يقلل false positives</td></tr>
+<tr><td class="p3">P3 — لاحقاً</td><td>وكلاء إضافيون واحداً بعد الآخر فقط عند وجود عميل يطلبه (Crash Hunter أولاً)؛ تخصيص ديناميكي للأجهزة؛ MCP</td><td>—</td><td>توسّع مدفوع بالطلب</td></tr>
+</tbody></table></section>
+<section id="ar-ideas"><h2>8. اقتراحات تطوير وإضافات</h2>
+<h3>تحسينات تقنية</h3>
+<ul><li>استبدال <code>uiautomator dump /dev/tty</code> بمسار احتياطي: dump إلى ملف ثم <code>cat</code>/<code>pull</code> (المشتبه الأول عند فشل GET_UI).</li>
+<li>التحقق من حمولة كل المهام عبر مخطط (schema) موحّد بدل <code>as</code>-casts (مثل <code>task.payload as SmokePayload</code>).</li>
+<li>إعادة المحاولة مع تراجع أسّي (backoff) لمزودي LLM عند 429/5xx، وحدّ تزامن بين الوكلاء.</li>
+<li>سجلّ تشغيل موحّد (Agent Run): مهارات، استدعاءات، رموز، تكلفة، أدلة في سجل واحد.</li>
+<li>فحص <code>detectCrash</code> على أنماط إضافية (StrictMode، OOM، ANR بلا اسم عملية) واختبارها على سجلات حقيقية من أجهزة متنوعة.</li>
+<li>إضافة <code>Dockerfile</code> مع أدوات adb للتشغيل المتكرر، ودعم محاكيات في CI.</li></ul>
+<h3>ميزات منتج</h3>
+<ul><li>تقرير HTML تفاعلي: خطوات، لقطات، سجلات، خط زمني، زر «أعد الإنتاج».</li>
+<li>أهداف اختبار جاهزة (قوالب): تسجيل الدخول، الشراء التجريبي، الإعدادات، الاتجاه العمودي/الأفقي، انقطاع الشبكة.</li>
+<li>مقارنة بين الإصدارات (regression): نفس السيناريو على إصدارين، تقرير فروقات.</li>
+<li>تكامل CI للعميل (GitHub Action تستقبل APK وتُرجع حالة + تقرير).</li>
+<li>تغطية الشاشات: خريطة الشاشات المكتشفة والنسبة المستكشفة.</li>
+<li>وضع «اختبار بصري» لاكتشاف انحرافات التخطيط، واختبار الأداء (FPS، ذاكرة) للألعاب.</li>
+<li>إدخال Unicode حقيقي، واختبار اللغات (العربية RTL) — ميزة تمايز للمنطقة.</li></ul></section>
+<section id="ar-risks"><h2>9. مصفوفة المخاطر</h2>
+<table><thead><tr><th>الخطر</th><th>الاحتمال</th><th>الأثر</th><th>التخفيف</th></tr></thead><tbody>
+<tr><td>تسريب مفتاح عبر خادم API</td><td>مرتفع إن شُغّل أثناء تصفح الإنترنت</td><td>مرتفع (مالي)</td><td>S-1/S-2</td></tr>
+<tr><td>فشل adb على أجهزة حقيقية (أنماط مختلفة)</td><td>مرتفع</td><td>متوسط</td><td>تشغيل حقيقي مبكر، مسارات احتياطية</td></tr>
+<tr><td>تكلفة LLM أعلى من القيمة</td><td>غير معروف</td><td>مرتفع</td><td>قياس التكلفة لكل خطأ مكتشف</td></tr>
+<tr><td>نتائج غير حتمية</td><td>مرتفع</td><td>مرتفع</td><td>إعادة تأكيد، فصل VERIFIED/AI</td></tr>
+<tr><td>فقدان البيانات (ذاكرة فقط)</td><td>مؤكد عند أي إعادة تشغيل</td><td>متوسط</td><td>SQLite</td></tr>
+<tr><td>تضخم النطاق (36 وكيلاً)</td><td>مرتفع</td><td>مرتفع</td><td>تجميد الوكلاء الجدد</td></tr>
+</tbody></table></section>
+<section id="ar-appendix"><h2>10. ملحق: كيف أعدتَ الفحص</h2>
+<pre>git clone https://github.com/MOT1209/-AgentLab.git &amp;&amp; cd -AgentLab
+npm ci
+npm test                         # 182 tests
+npm run skills:validate
+node --experimental-test-coverage --test "dist/test/*.test.js"
+npm audit
+REAL_DEVICE_TEST=1 npm run test:real   # يحتاج adb وجهازاً</pre>
+<p>تسريب S-1 (مبسّط): شغّل <code>createApiServer</code>، ثم <code>POST /providers</code> بـ <code>Content-Type: text/plain</code> وجسم JSON يحوي <code>baseUrl</code> لمستمع محلي و<code>auth.env: "ANTHROPIC_API_KEY"</code>، ثم <code>POST /providers/x/test</code>؛ سيصل رأس Authorization إلى المستمع.</p>
+<p>تنبيه: تقريري لم يُعدّل أي ملف شيفرة؛ الإصلاحات أعلاه مقترحات. أستطيع تنفيذ بنود P0 إن رغبت.</p></section></main><main lang="de" dir="ltr" id="de"><header><h1>Prüfbericht zum Projekt AgentLab</h1><p class="sub">Umfassende technische, sicherheitsbezogene und geschäftliche Analyse — basierend auf echten Tests des Codes</p><p class="meta">AgentLab · 2026-10-06 · branch <code>claude/busy-ramanujan-8dsoww</code> @ cd74f7e</p></header><nav><b>Inhalt:</b> <a href="#de-summary">1. Management-Zusammenfassung</a> · <a href="#de-facts">2. Was das Projekt ist (Fakten)</a> · <a href="#de-tests">3. Ergebnisse der tatsächlichen Tests</a> · <a href="#de-findings">4. Probleme und Schwachstellen (nach Schwere)</a> · <a href="#de-arch">5. Bewertung der Architektur</a> · <a href="#de-biz">6. Geschäftliche Bewertung (Meinung und Schätzung, keine Fakten)</a> · <a href="#de-plan">7. Vorgeschlagener Maßnahmenplan (nach Priorität)</a> · <a href="#de-ideas">8. Vorschläge für Weiterentwicklung und Ergänzungen</a> · <a href="#de-risks">9. Risikomatrix</a> · <a href="#de-appendix">10. Anhang: So reproduzieren Sie die Prüfung</a></nav><section id="de-summary"><h2>1. Management-Zusammenfassung</h2>
+<div class="verdict"><b>Urteil (meine Meinung):</b> Saubere Architektur und gute Umsetzung für einen Prototyp, aber <b>das Produkt hat noch nicht bewiesen, dass es auf einem echten Gerät und mit einem echten Sprachmodell funktioniert</b>. Das größte Risiko ist derzeit nicht technisch, sondern geschäftlich: Gebaut wurde mehr (36 Agenten, davon nur 2 funktionsfähig), als bewiesen ist (null echte Läufe).</div>
+<div class="cards">
+<div class="card"><span class="n ok">182</span>Tests — 180 bestanden, 0 fehlgeschlagen, 2 übersprungen</div>
+<div class="card"><span class="n ok">97,2 %</span>Zeilenabdeckung (Zweige 90 %)</div>
+<div class="card"><span class="n ok">0</span>Schwachstellen in Abhängigkeiten (npm audit)</div>
+<div class="card"><span class="n bad">1</span>reproduzierte kritische Schwachstelle (S-1)</div>
+<div class="card"><span class="n warn">0</span>Läufe auf echtem Gerät/Modell</div>
+</div>
+<h3>Die 5 wichtigsten Maßnahmen</h3>
+<ol><li><b>S-1/S-2 noch heute schließen</b> (Stunden): Token + Host-Prüfung + nur JSON für <code>src/api</code>, oder diesen Server löschen.</li>
+<li><b>Auf einem echten Gerät/Emulator laufen lassen</b>, mit echtem Modell (Kosten: wenige Dollar). Bis dahin ist alles Vermutung.</li>
+<li><b>Eine Test-App mit bekannten Fehlern bauen</b> und messen: Wie viele Fehler findet der Agent, zu welchen Kosten, verglichen mit dem kostenlosen <code>adb shell monkey</code>? Schlägt er ihn nicht klar, gibt es keinen Geschäftswert.</li>
+<li><b>CI einrichten</b> (30 Minuten) und <b>eine Lizenz</b> hinzufügen.</li>
+<li><b>Keine weiteren Agenten bauen.</b> Zwei Agenten ausgezeichnet zum Laufen bringen, bevor die übrigen 22 entstehen.</li></ol></section>
+<section id="de-facts"><h2>2. Was das Projekt ist (Fakten)</h2>
+<p>Eine KI-gestützte Testplattform für Android-Apps und -Spiele. Feste Hierarchie: <b>12 Haupt- und 24 Unter-Agenten</b> (36). Striktes TypeScript auf Node 22, nur eine Laufzeit-Abhängigkeit (<code>@anthropic-ai/sdk</code>), Tests mit <code>node:test</code>. Codeumfang ca. 10,3 Tsd. Zeilen (Quellcode + Tests + UI).</p>
+<table><thead><tr><th>Komponente</th><th>Pfad</th><th>Stand (laut README und meiner Prüfung)</th></tr></thead><tbody>
+<tr><td>Agenten-Framework und Orchestrator</td><td>src/agents, src/orchestrator.ts</td><td>gebaut und getestet (Mock)</td></tr>
+<tr><td>Geräteverwaltung (Leases, Health, Discovery)</td><td>src/runtime</td><td>gebaut und getestet (Mock + simuliertes adb)</td></tr>
+<tr><td>LLM-Provider (Anthropic, OpenAI-compatible, Mock)</td><td>src/providers</td><td>nur mit Fakes getestet — kein echter Aufruf erfolgt</td></tr>
+<tr><td>AdbDevice</td><td>src/device</td><td>nie auf echtem Gerät gelaufen</td></tr>
+<tr><td>Exploration-Agent MAIN-05-A</td><td>src/agents/exploration</td><td>Schleife observe→decide→validate→execute; nie mit echtem Gerät/LLM gelaufen</td></tr>
+<tr><td>Smoke-Agent MAIN-01-B</td><td>src/agents/behaviors</td><td>läuft im Mock; siehe S-5</td></tr>
+<tr><td>22 Unter-Agenten</td><td>—</td><td>registriert ohne Verhalten → liefern BLOCKED</td></tr>
+<tr><td>Skill- und Berechtigungssystem</td><td>src/skills</td><td>20 Skills, 36 Profile, Validierung erfolgreich</td></tr>
+<tr><td>Lokale UI (Token) / Control Center</td><td>src/ui / src/api+web</td><td>erste sicher; zweite unsicher</td></tr>
+</tbody></table>
+<p class="note">Die Ehrlichkeit der README ist hoch: Sie sagt klar „nie auf echtem Gerät erprobt“ — genau das habe ich bestätigt. Das stärkt das Vertrauen.</p></section>
+<section id="de-tests"><h2>3. Ergebnisse der tatsächlichen Tests</h2>
+<p>Was ich in der Cloud-Umgebung ausgeführt habe (kein Android-Gerät, kein LLM-Schlüssel):</p>
+<table><thead><tr><th>Prüfung</th><th>Ergebnis</th></tr></thead><tbody>
+<tr><td><code>npm ci</code></td><td>erfolgreich</td></tr>
+<tr><td><code>npm test</code> (striktes tsc + Build + alle Tests)</td><td>182 Tests: <b>180 bestanden, 0 fehlgeschlagen, 2 übersprungen</b> (Echtgerät-Test und echter adb-Test) — Dauer 2,3 s</td></tr>
+<tr><td>Code-Abdeckung</td><td>Zeilen 97,21 % · Zweige 89,95 % · Funktionen 96,09 %</td></tr>
+<tr><td><code>npm run skills:validate</code></td><td>ok: 20 Skills, 36 Profile, generierte Dateien synchron</td></tr>
+<tr><td><code>npm audit</code></td><td>0 Schwachstellen</td></tr>
+<tr><td><code>npm outdated</code></td><td>TypeScript 5.9.3 (aktuell 7.x) und @types/node 22 — nichts Dringendes</td></tr>
+<tr><td>Aktive Sicherheitsprüfung von <code>src/api</code></td><td>CSRF, gefälschter Host, großer Body, Path Traversal, fehlerhafter Pfad, Schlüssel-Leck — Ergebnisse in Abschnitt 4</td></tr>
+</tbody></table>
+<h3>Was ich nicht getestet habe (und ich sage klar: Ich weiß es nicht)</h3>
+<ul><li>Verhalten von <code>adb</code> auf echtem Gerät oder Emulator (ich weiß nicht, ob <code>uiautomator dump /dev/tty</code> auf Ihren Geräten funktioniert).</li>
+<li>Qualität und Kosten der Entscheidungen eines echten Modells sowie die Fehlerfindungsrate.</li>
+<li>Die Web-UI in einem echten Browser (die Tests decken Server und Logik ab; ich habe die Seiten nicht visuell geöffnet), mobile Browser, Windows.</li>
+<li>Performance unter Last und paralleler Betrieb mehrerer Geräte.</li></ul>
+<p class="note">Methodischer Hinweis: Hohe Abdeckung misst, dass Code ausgeführt wurde, nicht dass er gegenüber der echten Welt korrekt ist. Alle Tests laufen gegen Simulationen, die derselbe Entwickler geschrieben hat; Fehler vom Typ „das Gerät verhält sich anders als erwartet“ tauchen dort nicht auf. <b>Das ist die größte Qualitätslücke.</b></p></section>
+<section id="de-findings"><h2>4. Probleme und Schwachstellen (nach Schwere)</h2><p><span class="sev CRITICAL">Kritisch: 1</span> <span class="sev HIGH">Hoch: 2</span> <span class="sev MEDIUM">Mittel: 6</span> <span class="sev LOW">Niedrig: 3</span></p><div class="tw"><table class="ft"><thead><tr><th>ID</th><th>Schwere</th><th>Befund</th><th>Nachweis</th><th>Empfohlene Behebung</th></tr></thead><tbody><tr id="de-S-1"><td><b>S-1</b></td><td><span class="sev CRITICAL">Kritisch</span></td><td><b>API-Key-Diebstahl per CSRF: jede Webseite kann Umgebungs-Secrets abgreifen</b><br>Der Server <code>npm run dev:api</code> hat keine Authentifizierung und prüft weder <code>Content-Type</code> noch <code>Host</code>. Eine bösartige Webseite im Browser kann einen einfachen POST (<code>text/plain</code>, ohne Preflight) an <code>localhost:4000/providers</code> senden und einen Provider mit angreiferkontrollierter <code>baseUrl</code> und <code>auth.env = ANTHROPIC_API_KEY</code> registrieren, danach POST an <code>/providers/x/test</code>. Ergebnis: Der Server schickt <code>Authorization: Bearer &lt;Ihr Schlüssel&gt;</code> an den Angreifer. <b>Ich habe das real reproduziert</b>: ein Testserver hat den vollständigen Schlüssel empfangen.<br><small class="file">src/api/server.ts</small></td><td><span class="st REPRO">Reproduziert</span></td><td>(1) Pflicht-Token auf jeder Route wie in <code>src/ui/server.ts</code>; (2) <code>Host</code>-Prüfung und nur <code>application/json</code>; (3) Allowlist erlaubter Umgebungsvariablen-Namen und Bindung jedes Namens an erlaubte <code>baseUrl</code>-Hosts; (4) beide Server zusammenführen (siehe A-1).</td></tr><tr id="de-S-2"><td><b>S-2</b></td><td><span class="sev HIGH">Hoch</span></td><td><b>CSRF / DNS-Rebinding: jede Webseite kann Tests auf Ihren Geräten starten</b><br>Ein <code>POST /tests</code> mit <code>text/plain</code> und <code>Host: evil.example</code> lieferte <b>202 Accepted</b> und startete die Ausführung. Jede Webseite kann Aufgaben auf angeschlossenen Geräten starten und per DNS-Rebinding den <code>/events</code>-Stream (Screenshots, Logs) lesen.<br><small class="file">src/api/server.ts</small></td><td><span class="st REPRO">Reproduziert</span></td><td>Gleiche Fixes wie S-1. Zusätzlich Sicherheits-Header setzen (<code>X-Content-Type-Options</code>, <code>Content-Security-Policy</code>, <code>Cache-Control: no-store</code>); die aktuelle Antwort hat keine.</td></tr><tr id="de-S-3"><td><b>S-3</b></td><td><span class="sev MEDIUM">Mittel</span></td><td><b>Keine Größenbegrenzung für Request-Bodies</b><br><code>readJsonBody</code> puffert den gesamten Body im Speicher. Ich habe 20 MB getestet; sie wurden komplett gelesen, bevor abgelehnt wurde. Eine einzige große Anfrage kann den Speicher erschöpfen. (Der <code>src/ui</code>-Server hat ein 64-KB-Limit; die Lösung existiert also im Projekt.)<br><small class="file">src/api/server.ts:27</small></td><td><span class="st CODE">Aus Code-Lektüre</span></td><td>Das Muster von <code>readJson</code> aus <code>src/ui/server.ts</code> übernehmen: 64 KB, Status 413.</td></tr><tr id="de-S-4"><td><b>S-4</b></td><td><span class="sev LOW">Niedrig</span></td><td><b>Fehlerhafter URL-Pfad liefert 500 statt 400</b><br><code>GET /%E0%A4%A</code> liefert <code>500 {"error":"URI malformed"}</code>, weil <code>decodeURIComponent</code> eine Exception wirft. Der Path-Traversal-Schutz funktioniert: <code>/..%2f..%2fpackage.json</code> ergab 404 — positiv.<br><small class="file">src/api/server.ts:55</small></td><td><span class="st REPRO">Reproduziert</span></td><td>Exception abfangen und 400 zurückgeben.</td></tr><tr id="de-S-5"><td><b>S-5</b></td><td><span class="sev MEDIUM">Mittel</span></td><td><b>Smoke-Test: ungeprüfte Eingaben und schwache Crash-Erkennung</b><br>(a) <code>apkPath</code> geht ungeprüft an <code>adb install -r</code>; ein Pfad mit führendem <code>-</code> wird als adb-Option interpretiert (Argument-Injection, keine Shell-Injection, da <code>execFile</code>). (b) Kein <code>logcat -c</code> vorab: ein alter Crash einer anderen App führt zu einem <b>falschen FAILED</b>; der Regex <code>/FATAL EXCEPTION|ANR in/</code> filtert nicht nach Paket, während der Exploration-Agent das bessere <code>detectCrash</code> nutzt. (c) Kein <code>try/finally</code> — schlägt <code>screenshot</code> fehl, wird die App nicht gestoppt.<br><small class="file">src/agents/behaviors/smoke.ts</small></td><td><span class="st CODE">Aus Code-Lektüre</span></td><td>Payload validieren (absoluter Pfad, .apk, Datei existiert); <code>clearLogs</code> und <code>detectCrash(logs, packageName)</code> nutzen; <code>stop</code> in <code>finally</code>.</td></tr><tr id="de-R-1"><td><b>R-1</b></td><td><span class="sev HIGH">Hoch</span></td><td><b>30-Sekunden-Timeout für alle adb-Befehle, auch für Installation</b><br><code>install</code> einer großen App/eines Spiels (hunderte MB) überschreitet 30 s leicht und scheitert. Direktes Risiko, da das Produkt Spiele anvisiert. Nicht auf einem Gerät getestet (hier keines vorhanden) — Schlussfolgerung aus dem Code.<br><small class="file">src/device/adb-device.ts:27</small></td><td><span class="st CODE">Aus Code-Lektüre</span></td><td>Timeout pro Befehl: 30 s allgemein, 5–10 min für Installation, konfigurierbar.</td></tr><tr id="de-R-2"><td><b>R-2</b></td><td><span class="sev MEDIUM">Mittel</span></td><td><b>Jeder adb-Fehler setzt das Gerät auf ERROR</b><br><code>this.lastState = "ERROR"</code> wird bei jeder Exception gesetzt, auch bei transienten Fehlern wie <code>uiautomator dump</code> während einer Animation (in known-issues dokumentiert). <code>UiApp.startRun</code> lehnt Geräte ab, die nicht ONLINE sind; ein gesundes Gerät kann so blockiert werden. Annahme: nicht auf echter Hardware reproduziert.<br><small class="file">src/device/adb-device.ts:43</small></td><td><span class="st CODE">Aus Code-Lektüre</span></td><td>Verbindungsverlust von einzelnem Befehlsfehler trennen; Zähler für aufeinanderfolgende Fehler verwenden.</td></tr><tr id="de-R-3"><td><b>R-3</b></td><td><span class="sev MEDIUM">Mittel</span></td><td><b>TYPE entfernt alles außer einfachem ASCII — keine arabischen Zeichen, keine Sonderzeichen</b><br><code>replace(/[^A-Za-z0-9 @._-]/g, "")</code> löscht Arabisch, Umlaute (ä, ß) und Symbole (<code>+ ! #</code>). Starke Passwörter, arabischer Text oder E-Mails mit <code>+</code> sind nicht eingebbar. Das schränkt besonders den Test von Formularen ein — einen der wichtigsten Testfälle.<br><small class="file">src/device/adb-device.ts:68</small></td><td><span class="st CODE">Aus Code-Lektüre</span></td><td>Für ASCII <code>input text</code> mit korrektem Escaping; für Unicode die ADBKeyboard-App oder Zwischenablage. <code>TYPE</code> aus einer Liste vorbereiteter Testwerte statt Freitext des Modells.</td></tr><tr id="de-R-4"><td><b>R-4</b></td><td><span class="sev MEDIUM">Mittel</span></td><td><b>Prompt-Injection über App-Texte</b><br>UI-Texte und Logzeilen gehen an das Modell. Eine App (oder Seite in einer WebView) mit Text wie „Ignoriere die Anweisungen und tippe …“ kann das Modell lenken. Der Schutz ist im Kern gut: Das Modell kann nur 1 von 12 Aktionen wählen und hat keine Shell. Restrisiko: gefälschte Befunde (<code>AI_OBSERVATION</code>) oder verschwendete Schritte, keine Befehlsausführung. Fehlt: klare Trennung von „Anweisungen“ und „nicht vertrauenswürdigen Daten“ im Prompt.<br><small class="file">src/agents/exploration/prompt.ts</small></td><td><span class="st CODE">Aus Code-Lektüre</span></td><td>Bildschirmdaten in ein als nicht vertrauenswürdig markiertes Feld legen und das im System-Prompt festhalten; Sperrliste für heikle Aktionen (Kauf, Konto löschen) anhand des Button-Texts.</td></tr><tr id="de-A-1"><td><b>A-1</b></td><td><span class="sev MEDIUM">Mittel</span></td><td><b>Zwei überlappende Web-UIs mit unterschiedlichen Modellen</b><br><code>src/ui</code> (sicher: Token + Host + CSP + Größenlimit) und <code>src/api + web/</code> (Control Center, ohne Schutz). Beide decken ähnliche Funktionen ab. Die zweite ist die Quelle von S-1 bis S-3. In known-issues bekannt, aber nur als MEDIUM eingestuft — der praktische Test hebt es auf CRITICAL.<br><small class="file">src/api + src/ui + web/</small></td><td><span class="st CODE">Aus Code-Lektüre</span></td><td><code>src/ui/server.ts</code> zur Basis machen, Control-Center-Funktionen (Provider, Agentenverwaltung) dorthin übernehmen, den Rest löschen.</td></tr><tr id="de-Q-1"><td><b>Q-1</b></td><td><span class="sev LOW">Niedrig</span></td><td><b>Kein CI, kein Linter, keine Lizenz, kein Dockerfile, kein engines-Feld</b><br>Es gibt kein <code>.github/workflows</code>. Die Tests sind exzellent, laufen aber nicht automatisch. <code>package.json</code> hat kein <code>engines</code>-Feld, obwohl die README Node 22 verlangt (nutzt <code>AbortSignal.any</code>). Keine Lizenz: automatisch alle Rechte vorbehalten, das blockiert Mitwirkende und Unternehmenskunden.<br><small class="file">repo</small></td><td><span class="st CODE">Aus Code-Lektüre</span></td><td>GitHub Actions: <code>npm ci &amp;&amp; npm test &amp;&amp; npm run skills:validate</code>; ESLint + Prettier ergänzen; <code>"engines": {"node": "&gt;=22"}</code>; Lizenz wählen (oder bewusst geschlossen lassen).</td></tr><tr id="de-Q-2"><td><b>Q-2</b></td><td><span class="sev LOW">Niedrig</span></td><td><b>Gesamter Zustand im Speicher und unbegrenzt</b><br>Screenshots liegen in einer <code>Map</code> ohne Größenlimit (Events sind auf 1000 begrenzt, Screenshots nicht); <code>TaskStore</code> behält alle Tasks für immer; ein Server-Neustart verliert alles. Für einen Prototyp akzeptabel, nicht für echten Einsatz.<br><small class="file">src/ui/app.ts, src/api/task-store.ts</small></td><td><span class="st CODE">Aus Code-Lektüre</span></td><td>SQLite für Läufe und Evidenz; Limit für Anzahl/Größe der Screenshots; periodische Bereinigung.</td></tr></tbody></table></div></section>
+<section id="de-arch"><h2>5. Bewertung der Architektur</h2>
+<h3>Stärken (aus dem Code bestätigte Fakten)</h3>
+<ul><li><b>Klare Sicherheitsgrenze für das Modell:</b> 12 feste Aktionen, <code>validateDecision</code> ist der einzige Weg von der Modellausgabe zur Aktion; keine Shell, kein rohes adb; <code>execFile</code> mit festen Argumenten; Paketname per Regex geprüft.</li>
+<li><b>Trennung der Evidenz:</b> <code>VERIFIED</code> (aus Logs) vs. <code>AI_OBSERVATION</code> (Behauptung des Modells) — eine reife Entscheidung, die verhindert, dass das Modell einen Test per Behauptung scheitern lässt.</li>
+<li><b>Harte Grenzen:</b> maxSteps, maxLlmCalls, Timeout und Abbruch, Semantik BLOCKED vs. ERROR, exklusive Geräte-Leases.</li>
+<li><b>Schlüssel:</b> nur per Namen in der Umgebung, aus Fehlern geschwärzt, Evidenzdateien mit 0600, <code>detectCrash</code> ignoriert Abstürze fremder Apps.</li>
+<li>Eine Abhängigkeit + striktes TypeScript + <code>noUncheckedIndexedAccess</code>. Ehrliche Dokumentation und Projektnotizen (known-issues).</li></ul>
+<h3>Schwächen</h3>
+<ul><li><b>Overengineering — meine Meinung:</b> 36 Agenten mit Definitionen und Berechtigungen, 20 Skills, 36 Profile und ein SKILL.md-Generator — bei nur zwei Agenten mit Verhalten. Die „Agenten“ sind hier mehr Daten als Fähigkeit. Diese Komplexität zahlen Sie bei jeder Änderung, ohne Kundennutzen.</li>
+<li><b>12 feste Geräte:</b> Die feste Zuordnung MAIN→Gerät passt nicht zur Realität mit ein oder zwei Geräten (in known-issues bekannt).</li>
+<li><b>Das Modell ist „blind“:</b> Es sieht den UI-Baum nur als Text; Spiele, WebViews und Canvas sind kaum sichtbar — und das ist die erklärte Zielgruppe (Spiele). Ein strategischer Widerspruch, nicht bloß eine Lücke.</li>
+<li><b>Keine Persistenz:</b> keine Datenbank, daher keine Historie und kein Vergleich zwischen Läufen (Grundlage jedes Testprodukts).</li>
+<li><b>Kein Kostenlimit in Geld:</b> Grenzen nur nach Schritten und Tokens; Betriebskosten unbekannt.</li></ul></section>
+<section id="de-biz"><h2>6. Geschäftliche Bewertung (Meinung und Schätzung, keine Fakten)</h2>
+<p class="note">Ich habe aktuelle Marktdaten nicht im Internet geprüft; die folgenden Aussagen stammen aus meinem Allgemeinwissen und meiner Einschätzung. Betrachten Sie sie als zu testende Hypothesen.</p>
+<table><thead><tr><th>Kriterium</th><th>Einschätzung</th><th>Begründung / Risiken</th></tr></thead><tbody>
+<tr><td>Marktnachfrage</td><td>mittel–hoch</td><td>Mobile Tests sind teuer und lästig; Käufer wollen aber <i>verlässliche Ergebnisse</i>, keine „Agenten“. Spiele sind ein schwierigerer, engerer Markt.</td></tr>
+<tr><td>Wettbewerb</td><td>hoch</td><td>Etablierte Tools (Appium, Maestro, Firebase Test Lab, BrowserStack/LambdaTest u. a.) und Startups mit KI-Tests. Ich kenne den aktuellen Stand nicht genau. Differenzierung noch unklar.</td></tr>
+<tr><td>Technische Schwierigkeit</td><td>hoch</td><td>Zuverlässigkeit (stabile Ergebnisse) ist schwerer als Fähigkeit. Die Modellschleife ist nicht deterministisch: dieselbe App kann unterschiedliche Ergebnisse liefern.</td></tr>
+<tr><td>Kosten</td><td>unbekannt</td><td>Nicht gemessen. 15 Schritte × LLM-Aufruf je Schritt × Apps × Geräte. Günstige deterministische Tools könnten überlegen sein.</td></tr>
+<tr><td>Zeit bis zum echten MVP-Beweis</td><td>2–4 Wochen</td><td>Gerät + Modell + Test-App + Vergleichsmetrik. Die Code-Basis steht, es fehlt die Realität.</td></tr>
+<tr><td>Skalierbarkeit</td><td>derzeit schwach</td><td>Nur Speicher, ein Nutzer, ein Gerät pro Lauf. Cloud erfordert eine Geräte-Farm (teuer) oder Emulatoren.</td></tr>
+<tr><td>Umsatzpotenzial</td><td>möglich, aber unbewiesen</td><td>Abo pro App/Monat oder Bezahlung pro Lauf. Ohne Kostendaten und Kundentests kann ich keine Zahl schätzen.</td></tr>
+</tbody></table>
+<h3>Warum der Plan scheitern könnte (vor dem Warum er gelingen könnte)</h3>
+<ol><li><b>Wert unbewiesen:</b> Findet der Agent nicht mehr Fehler als das kostenlose <code>monkey</code> zu vertretbaren Kosten, gibt es kein Produkt.</li>
+<li><b>Instabilität:</b> Tests mit wechselnden Ergebnissen zerstören schnell das Vertrauen der Entwickler (False Positives sind schlimmer als False Negatives).</li>
+<li><b>Spiele:</b> Ohne Bildverständnis (Vision) ist die Exploration schwach; mit Vision steigen Kosten und Datenschutzrisiko.</li>
+<li><b>Datenschutz:</b> Das Senden von Bildschirmtext und Logs an einen externen Anbieter kann Unternehmenskunden ausschließen.</li>
+<li><b>Verzettelung:</b> 36 Agenten zu bauen, bevor eine Schleife bewiesen ist, frisst Zeit und Motivation.</li>
+<li><b>Anbieterabhängigkeit:</b> Preise und Richtlinien von Modellen ändern sich; Teilschutz besteht (mehrere Provider).</li></ol>
+<h3>Einfachster Weg (einfachste Lösung zuerst)</h3>
+<p>Ein Agent (Exploration) + ein Gerät + HTML/JSON-Bericht + Vergleichsmetrik. Verkaufen Sie <i>„Fehlerbericht für Ihre App innerhalb einer Stunde zum Festpreis“</i> als halbautomatischen Service an die ersten 3–5 Kunden, bevor Sie eine Plattform bauen. Das beweist die Nachfrage zu den geringsten Kosten.</p></section>
+<section id="de-plan"><h2>7. Vorgeschlagener Maßnahmenplan (nach Priorität)</h2>
+<table><thead><tr><th>Phase</th><th>Punkt</th><th>Aufwand</th><th>Nutzen</th></tr></thead><tbody>
+<tr><td class="p0">P0 — jetzt</td><td>S-1/S-2/S-3 schließen (Token, Host, nur JSON, Body-Limit, Allowlist für Namen und Hosts) oder <code>src/api</code> löschen</td><td>2–6 Stunden</td><td>beseitigt kritische Lücke</td></tr>
+<tr><td class="p0">P0</td><td>CI mit GitHub Actions + <code>engines</code> + Lizenz</td><td>1 Stunde</td><td>schützt Qualität</td></tr>
+<tr><td class="p0">P0</td><td>Erster echter Lauf: <code>REAL_DEVICE_TEST=1 npm run test:real</code>, dann <code>npm run ui</code> auf einem Emulator</td><td>halber Tag</td><td>macht aus Vermutung Wissen</td></tr>
+<tr><td class="p1">P1 — Woche</td><td>R-1 (Installations-Timeout), R-2 (ERROR-Zustand), R-3 (TYPE), S-5 (Smoke) beheben</td><td>1–2 Tage</td><td>Zuverlässigkeit auf echtem Gerät</td></tr>
+<tr><td class="p1">P1</td><td>Test-App mit eingebauten Fehlern + Metrik: gefundene Fehler / Dollar, gegen <code>monkey</code></td><td>2–3 Tage</td><td>wichtigster Geschäftsbeweis</td></tr>
+<tr><td class="p1">P1</td><td>Beide UIs zu einer zusammenführen (A-1)</td><td>2–3 Tage</td><td>weniger Angriffsfläche und Wartung</td></tr>
+<tr><td class="p2">P2 — Monat</td><td>SQLite-Persistenz: Läufe, Evidenz, Kosten; teilbarer HTML-Bericht; Geldlimit pro Lauf (manuelle Preistabelle)</td><td>1–2 Wochen</td><td>Beginn eines Produkts</td></tr>
+<tr><td class="p2">P2</td><td>Vision (Screenshots an das Modell) als Option, mit Kostenlimit und Schwärzung sensibler Daten</td><td>1 Woche</td><td>öffnet Spiele</td></tr>
+<tr><td class="p2">P2</td><td>Nichtdeterminismus mindern: Abstürze automatisch erneut abspielen und bestätigen, Reproduktionsschritte anhängen</td><td>1 Woche</td><td>weniger False Positives</td></tr>
+<tr><td class="p3">P3 — später</td><td>Weitere Agenten einzeln und nur bei konkreter Kundennachfrage (Crash Hunter zuerst); dynamische Geräte-Zuweisung; MCP</td><td>—</td><td>nachfragegetriebenes Wachstum</td></tr>
+</tbody></table></section>
+<section id="de-ideas"><h2>8. Vorschläge für Weiterentwicklung und Ergänzungen</h2>
+<h3>Technische Verbesserungen</h3>
+<ul><li><code>uiautomator dump /dev/tty</code> durch Rückfallpfad ersetzen: Dump in Datei, dann <code>cat</code>/<code>pull</code> (erster Verdächtiger, wenn GET_UI scheitert).</li>
+<li>Payload jeder Aufgabe über ein einheitliches Schema validieren statt <code>as</code>-Casts (z. B. <code>task.payload as SmokePayload</code>).</li>
+<li>Wiederholung mit exponentiellem Backoff für LLM-Provider bei 429/5xx und Parallelitätslimit zwischen Agenten.</li>
+<li>Einheitlicher Run-Datensatz (Agent Run): Skills, Aufrufe, Tokens, Kosten, Evidenz an einem Ort.</li>
+<li><code>detectCrash</code> um Muster erweitern (StrictMode, OOM, ANR ohne Prozessnamen) und mit echten Logs verschiedener Geräte testen.</li>
+<li><code>Dockerfile</code> mit adb-Tools für reproduzierbaren Betrieb; Emulator-Unterstützung in CI.</li></ul>
+<h3>Produktfunktionen</h3>
+<ul><li>Interaktiver HTML-Bericht: Schritte, Screenshots, Logs, Zeitleiste, Button „Reproduzieren“.</li>
+<li>Vorgefertigte Testziele (Vorlagen): Login, Test-Kauf, Einstellungen, Hoch-/Querformat, Netzwerkausfall.</li>
+<li>Versionsvergleich (Regression): gleiches Szenario auf zwei Versionen, Differenzbericht.</li>
+<li>CI-Integration für Kunden (GitHub Action nimmt APK entgegen, liefert Status + Bericht).</li>
+<li>Screen-Abdeckung: Karte der entdeckten Screens und erkundeter Anteil.</li>
+<li>Visueller Test-Modus für Layout-Abweichungen und Performance-Tests (FPS, Speicher) für Spiele.</li>
+<li>Echte Unicode-Eingabe und Sprachtests (Arabisch RTL) — ein Differenzierungsmerkmal für die Region.</li></ul></section>
+<section id="de-risks"><h2>9. Risikomatrix</h2>
+<table><thead><tr><th>Risiko</th><th>Wahrscheinlichkeit</th><th>Auswirkung</th><th>Gegenmaßnahme</th></tr></thead><tbody>
+<tr><td>Schlüssel-Leck über API-Server</td><td>hoch, wenn beim Surfen gestartet</td><td>hoch (finanziell)</td><td>S-1/S-2</td></tr>
+<tr><td>adb-Fehler auf echten Geräten (Hersteller-Varianten)</td><td>hoch</td><td>mittel</td><td>früher echter Lauf, Rückfallpfade</td></tr>
+<tr><td>LLM-Kosten höher als der Nutzen</td><td>unbekannt</td><td>hoch</td><td>Kosten pro gefundenem Fehler messen</td></tr>
+<tr><td>Nichtdeterministische Ergebnisse</td><td>hoch</td><td>hoch</td><td>erneute Bestätigung, VERIFIED/AI-Trennung</td></tr>
+<tr><td>Datenverlust (nur Speicher)</td><td>sicher bei jedem Neustart</td><td>mittel</td><td>SQLite</td></tr>
+<tr><td>Scope-Ausweitung (36 Agenten)</td><td>hoch</td><td>hoch</td><td>Stopp für neue Agenten</td></tr>
+</tbody></table></section>
+<section id="de-appendix"><h2>10. Anhang: So reproduzieren Sie die Prüfung</h2>
+<pre>git clone https://github.com/MOT1209/-AgentLab.git &amp;&amp; cd -AgentLab
+npm ci
+npm test                         # 182 Tests
+npm run skills:validate
+node --experimental-test-coverage --test "dist/test/*.test.js"
+npm audit
+REAL_DEVICE_TEST=1 npm run test:real   # benötigt adb und ein Gerät</pre>
+<p>Leck S-1 (vereinfacht): <code>createApiServer</code> starten, dann <code>POST /providers</code> mit <code>Content-Type: text/plain</code> und JSON-Body mit <code>baseUrl</code> auf einen lokalen Listener und <code>auth.env: "ANTHROPIC_API_KEY"</code>, danach <code>POST /providers/x/test</code>; der Authorization-Header erreicht den Listener.</p>
+<p>Hinweis: Mein Bericht hat keine Code-Datei verändert; die genannten Fixes sind Vorschläge. Ich kann die P0-Punkte auf Wunsch umsetzen.</p></section></main></body></html>
