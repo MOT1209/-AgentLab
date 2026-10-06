@@ -83,6 +83,8 @@ interface RunState {
 }
 
 const MAX_EVENTS = 1000;
+/** Retention: finished real runs kept in SQLite; older ones are pruned on every save. */
+const MAX_STORED_RUNS = 50;
 const KEY_NAME = "AGENTLAB_UI_API_KEY";
 
 /** UI logic without HTTP, so it can be tested directly. Holds everything in memory. */
@@ -285,6 +287,12 @@ export class UiApp {
       this.opts.store.save(toStored(run), run.screenshots);
     } catch (e) {
       pushEvent(run, { kind: "storage-error", message: e instanceof Error ? e.message.slice(0, 200) : "save failed" });
+    }
+    // Retention is a separate concern: the run is already persisted, so a prune failure is not a save failure.
+    try {
+      this.opts.store.prune(MAX_STORED_RUNS);
+    } catch {
+      /* the run is safe in the database; the next save will try to prune again */
     }
   }
 

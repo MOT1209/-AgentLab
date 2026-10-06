@@ -40,6 +40,10 @@ export class RunStore {
         /* e.g. Windows */
       }
     }
+    // Before the tables: SQLite can only switch a database from "no autovacuum" to incremental mode
+    // while it is still empty, so this only takes effect for databases created from here on.
+    // With it on, prune() can actually hand freed pages back to the filesystem.
+    this.db.exec("PRAGMA auto_vacuum = INCREMENTAL");
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS runs (
         id TEXT PRIMARY KEY, started_at TEXT NOT NULL, finished_at TEXT, mode TEXT NOT NULL, test TEXT NOT NULL,
@@ -116,6 +120,48 @@ export class RunStore {
   screenshot(runId: string, evId: string): Buffer | undefined {
     const r = this.db.prepare("SELECT png FROM shots WHERE run_id = ? AND ev_id = ?").get(runId, evId) as { png: Uint8Array } | undefined;
     return r ? Buffer.from(r.png) : undefined;
+  }
+
+  /** Deletes one run and its screenshots. Returns true if a run was removed. */
+  delete(id: string): boolean {
+    this.db.exec("BEGIN");
+    try {
+      this.db.prepare("DELETE FROM shots WHERE run_id = ?").run(id);
+      const r = this.db.prepare("DELETE FROM runs WHERE id = ?").run(id);
+      this.db.exec("COMMIT");
+      return Number(r.changes ?? 0) > 0;
+    } catch (e) {
+      this.db.exec("ROLLBACK");
+      throw e;
+    }
+  }
+
+  /**
+   * Retention: keeps only the newest `keep` runs (and their screenshots).
+   * Returns how many runs were removed. Pages freed by the delete are returned to the filesystem,
+   * otherwise the file would keep the high-water mark of its largest screenshot set forever.
+   */
+  prune(keep = 50): number {
+    const k = Math.max(1, Math.trunc(keep));
+    const stale = this.db.prepare("SELECT id FROM runs ORDER BY started_at DESC, rowid DESC LIMIT -1 OFFSET ?").all(k) as Array<{ id: string }>;
+    if (stale.length === 0) return 0;
+    let removed = 0;
+    this.db.exec("BEGIN");
+    try {
+      const delShots = this.db.prepare("DELETE FROM shots WHERE run_id = ?");
+      const delRuns = this.db.prepare("DELETE FROM runs WHERE id = ?");
+      for (const r of stale) {
+        delShots.run(r.id);
+        delRuns.run(r.id);
+        removed++;
+      }
+      this.db.exec("COMMIT");
+    } catch (e) {
+      this.db.exec("ROLLBACK");
+      throw e;
+    }
+    this.db.exec("PRAGMA incremental_vacuum"); // outside the transaction; a no-op on old databases
+    return removed;
   }
 
   close(): void {

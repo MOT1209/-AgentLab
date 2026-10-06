@@ -21,7 +21,7 @@ import { parseExplorationTask, type ExplorationTask } from "../src/agents/explor
 import { demoScreenshot } from "../src/ui/demo-png.js";
 import type { AgentResult } from "../src/agents/types.js";
 import { runDeviceScenario } from "./support/e2e-scenario.js";
-import { createFakeAdb, FAKE_SERIAL } from "./support/fake-adb.js";
+import { createFakeAdb, FAKE_ADB_SKIP, FAKE_SERIAL } from "./support/fake-adb.js";
 
 const PKG = "com.example.app";
 const tap = (x: number, y: number) => ({ json: { action: "TAP", target: { x, y }, reason: "r" } });
@@ -199,7 +199,8 @@ test("evidence is written under the evidence dir, linked by path, with generated
   assert.ok(files.every((f) => /^(EV-\d{3}\.(png|txt|json)|result\.json)$/.test(f)), files.join());
   const shot = r.evidence.find((e) => e.kind === "screenshot")!;
   assert.deepEqual([...readFileSync(shot.path!).subarray(0, 4)], [137, 80, 78, 71]);
-  assert.equal(statSync(shot.path!).mode & 0o077, 0, "files must not be group/world readable");
+  // POSIX permission bits are meaningless on NTFS: chmod(0600) still reports 0666, so only assert where they exist.
+  if (process.platform !== "win32") assert.equal(statSync(shot.path!).mode & 0o077, 0, "files must not be group/world readable");
   const saved = JSON.parse(readFileSync(join(runDir, "result.json"), "utf8"));
   assert.equal(saved.status, "PASSED");
   assert.ok(saved.evidence.filter((e: { kind: string }) => e.kind === "screenshot").every((e: { data: string }) => e.data.endsWith(".png")), "result.json must reference screenshots, not embed them");
@@ -252,7 +253,7 @@ test("an action the device cannot perform is never offered to the model", async 
 
 // ---------- AdbDevice security (argument construction) ----------
 
-test("AdbDevice: activity injection is rejected and typed text cannot become a shell command", async () => {
+test("AdbDevice: activity injection is rejected and typed text cannot become a shell command", { skip: FAKE_ADB_SKIP }, async () => {
   const fake = createFakeAdb();
   const d = new AdbDevice(FAKE_SERIAL, fake.bin);
   await d.launch("com.fake.app", ".Main");
@@ -270,7 +271,7 @@ test("AdbDevice: activity injection is rejected and typed text cannot become a s
 
 // ---------- simulated adb: real AdbDiscovery/AdbDevice process plumbing, fake device ----------
 
-test("SIMULATED adb end-to-end: same scenario as the real-device test, through real child processes", async () => {
+test("SIMULATED adb end-to-end: same scenario as the real-device test, through real child processes", { skip: FAKE_ADB_SKIP }, async () => {
   const fake = createFakeAdb();
   const evidenceDir = mkdtempSync(join(tmpdir(), "agentlab-sim-"));
   const llm = MockProvider.scripted([
@@ -306,7 +307,7 @@ test("SIMULATED adb end-to-end: same scenario as the real-device test, through r
   assert.match(ui.data, /Open menu/);
 });
 
-test("SIMULATED adb: a crash of the launched app becomes a verified finding; a device that goes away is handled", async () => {
+test("SIMULATED adb: a crash of the launched app becomes a verified finding; a device that goes away is handled", { skip: FAKE_ADB_SKIP }, async () => {
   const fake = createFakeAdb();
   const llm = MockProvider.scripted([{ json: { action: "LAUNCH_APP", reason: "start" } }, end()]);
   const rep = await runDeviceScenario({ adbPath: fake.bin, packageName: "com.fake.crash", llm, evidenceDir: mkdtempSync(join(tmpdir(), "agentlab-sim-")) });

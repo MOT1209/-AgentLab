@@ -12,6 +12,7 @@ import { ProviderManager } from "../src/providers/manager.js";
 import type { LlmProvider, LlmRequest } from "../src/providers/types.js";
 import type { AgentResult } from "../src/agents/types.js";
 import type { ExplorationResult } from "../src/agents/exploration/result.js";
+import { FAKE_ADB_SKIP } from "./support/fake-adb.js";
 
 const PKG = "com.example.app";
 const payload = { objective: "Explore the application", app: { packageName: PKG }, maxSteps: 5 };
@@ -129,7 +130,7 @@ test("uiautomator XML is parsed into nodes", () => {
   assert.deepEqual(nodes[1], { text: "Sign & go", desc: "Login", id: "com.example.app:id/login", cls: "android.widget.Button", pkg: PKG, clickable: true, enabled: true, bounds: { l: 100, t: 200, r: 300, b: 280 } });
 });
 
-test("AdbDevice builds fixed argument lists for the new operations (fake adb binary)", async () => {
+test("AdbDevice builds fixed argument lists for the new operations (fake adb binary)", { skip: FAKE_ADB_SKIP }, async () => {
   const dir = mkdtempSync(join(tmpdir(), "fakeadb-"));
   const bin = join(dir, "adb");
   const argLog = join(dir, "args.txt");

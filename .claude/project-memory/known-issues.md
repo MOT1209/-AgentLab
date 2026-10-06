@@ -1,7 +1,7 @@
 # KNOWN ISSUES
 
 - AdbDevice never run on a real device/emulator. Verified: argument construction, simulated adb pipeline, real adb binary without a device — HIGH — open
-- Crash detection is a log-marker match (FATAL EXCEPTION, ANR in, Fatal signal, process died); not a classifier. Logcat is now cleared on LAUNCH_APP in the exploration agent only (smoke handler still does not) — MEDIUM — open
+- Crash detection is a log-marker match (FATAL EXCEPTION, ANR in, Fatal signal, process died); not a classifier. Logcat is cleared on LAUNCH_APP in the exploration agent and in the smoke handler before launch — MEDIUM — open
 - Persistence: finished REAL web-UI runs are saved to SQLite (node:sqlite, experimental in Node 22); leases/assignments/message bus/library tasks are still in memory — LOW — open
 - Capabilities screen_recording, inspect_ui, network_control (and analysis ones) are declared but have no Device/tool implementation — MEDIUM — open
 - Only 2 of 24 SUB agents have behavior (MAIN-01-B smoke, MAIN-05-A explore); the rest report BLOCKED — LOW — open
@@ -22,7 +22,7 @@
 - Skill enforcement covers only AgentLab's own handlers/actions; generated .claude/.agent SKILL.md files are advisory and cannot be enforced — MEDIUM — by design
 - .agent/skills convention unverified (Antigravity docs and skills.sh were blocked); may need `.agents/` — LOW — open
 - Token ceiling can be overshot by one model call (usage is known after the call) — LOW — open
-- MAIN-05-B (Edge Case Agent) declares only tap/type/screenshot/logs, so it cannot run the exploration handler; it holds the exploration skill but only SCREENSHOT/LOG_READ/DEVICE_INTERACT effectively. MAIN-10-A declares no device capability. Their definitions need extending before real behavior is added — LOW — open
+- MAIN-05-B (Edge Case Agent) now declares the full explorer capability set so its exploration-skill grant is fully effective. MAIN-10-A declares no device capability (analysis only); extend its definition before adding device behavior — LOW — open
 - Skill selection is keyword (substring) matching, no semantics; wrong or missed skills are possible — LOW — open
 - Goal loop has no independent verification or replanning; the exploration loop only maps onto it — MEDIUM — open
 - No Agent Run record (skills, tools, LLM calls, tokens, cost, evidence in one place); only ExplorationTelemetry and the message bus — LOW — open
@@ -36,8 +36,10 @@
 - uiautomator dump via `exec-out ... /dev/tty` is device-dependent; some Android versions/OEMs need a file path instead. If GET_UI fails on a real device, this is the first suspect — MEDIUM — open
 - Health check allows a non-PNG screenshot only for MOCK devices; a real device returning odd screencap output is rejected — LOW — open
 - Simulated adb accepts the same commands the code currently sends; if the code changes its commands, update test/support/fake-adb.ts — LOW — open
+- The sensitive-tap guard (buy/pay/subscribe/delete-account/factory-reset/uninstall, EN/DE/AR) refuses a TAP that lands on an element whose label, description or id reads that way, unless the payload sets `allowSensitiveActions: true`. It matches element CENTERS within 2px, so a tap at free coordinates that happens to sit over a sensitive control is not caught; matching is keyword-based, not semantic, and it can refuse a harmless control whose label merely contains a word like "pay"; a disabled button is not distinguished from an enabled one — MEDIUM — open until a real device
+- The suite is green on ubuntu and windows-latest. Seven simulated-adb tests skip on win32 because the fake is a POSIX shell script and AdbDevice spawns adb with execFile and no shell by design, so Windows CI does not cover real process spawning for adb — LOW — by design
 - No linter is configured in this project (only tsc strict) — LOW — open
 - P1 fixes (unproven on real hardware): adb install timeout is 10 min (others 30s); only connection-loss errors set a device to ERROR; TYPE single-quotes ASCII (symbols kept) and non-ASCII needs the ADBKeyboard app (fails loudly otherwise, ADBKeyboard path never run on a device); smoke validates its payload, clears logs, uses package-scoped detectCrash and always stops the app — LOW — open until a real run
 - P1 still open: benchmark app with planted bugs vs adb monkey (needs a real device) — MEDIUM — open
 - P2 (all untested on real hardware/live models): vision request shapes follow the documented Anthropic/OpenAI image formats but never hit a live API; crash confirmation replays coordinates blindly (a layout change or timing makes a real crash look NOT_REPRODUCED); screenshots cannot be redacted; text redaction is regex best effort — MEDIUM — open
-- Run history has no retention policy or delete UI; the DB grows — LOW — open
+- Run history prunes to the newest 50 runs on every save (`RunStore.prune`, tested). `RunStore.delete` exists and is tested but has no UI route yet. `PRAGMA auto_vacuum = INCREMENTAL` is set before the tables so prune hands pages back, but only for databases created after that change; an existing `~/.agentlab/agentlab.db` keeps its old high-water mark until VACUUM — LOW — open

@@ -5,6 +5,18 @@ import { demoScreenshot } from "../../src/ui/demo-png.js";
 
 export const FAKE_SERIAL = "FAKE0001";
 
+/**
+ * The fake is a POSIX shell script, so the simulated-adb tests only run where one can be executed.
+ *
+ * `AdbDevice` spawns adb with `execFile` and no shell on purpose (arguments must not be able to inject
+ * commands), and Node cannot execute a shell script or a `.cmd` that way: `execFile` on Windows needs
+ * `shell: true` for batch files, and on POSIX it needs the extensionless script to have a shebang AND an
+ * executable bit, which a Windows filesystem does not give it. Adding `shell: true` just to make a test
+ * run would weaken the injection boundary the tests are checking, so those tests are skipped on win32.
+ * Everything else in the suite (health checks, discovery, the whole agent loop, the store, the UI) runs there.
+ */
+export const FAKE_ADB_SKIP = process.platform === "win32" ? "simulated adb needs a POSIX shell; AdbDevice spawns adb without a shell by design" : false;
+
 export const FAKE_UI_XML = `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?><hierarchy rotation="0">
 <node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="com.fake.app" clickable="false" enabled="true" bounds="[0,0][1080,1920]">
 <node index="0" text="Open menu" resource-id="com.fake.app:id/menu" class="android.widget.Button" package="com.fake.app" content-desc="" clickable="true" enabled="true" bounds="[100,200][500,300]" />

@@ -36,6 +36,42 @@ test("store: save/list/get/screenshots round-trip; re-saving replaces; newest fi
   s.close();
 });
 
+test("store: prune keeps the newest N runs and drops their screenshots too", () => {
+  const s = new RunStore(":memory:");
+  for (let i = 0; i < 10; i++) {
+    const id = `id${String(i).padStart(9, "0")}`;
+    s.save(run({ id, startedAt: `2026-01-${String(i + 1).padStart(2, "0")}T00:00:00Z` }), new Map([["EV-001", PNG]]));
+  }
+  assert.equal(s.list().length, 10);
+
+  assert.equal(s.prune(4), 6, "6 of the 10 runs are beyond the newest 4");
+  const kept = s.list();
+  assert.deepEqual(kept.map((r) => r.id), ["id000000009", "id000000008", "id000000007", "id000000006"]);
+  for (const r of kept) assert.equal(s.screenshots(r.id).size, 1, "kept runs keep their screenshots");
+  assert.equal(s.get("id000000000"), undefined);
+  assert.equal(s.screenshots("id000000000").size, 0, "a pruned run leaves no orphaned screenshots");
+
+  assert.equal(s.prune(4), 0, "nothing left to prune");
+  assert.equal(s.prune(1), 3);
+  assert.equal(s.list().length, 1);
+  s.close();
+});
+
+test("store: delete removes one run and its screenshots, and says whether it existed", () => {
+  const s = new RunStore(":memory:");
+  s.save(run({ id: "aaaaaaaaaa", startedAt: "2026-01-01T00:00:00Z" }), new Map([["EV-001", PNG], ["EV-002", PNG]]));
+  s.save(run({ id: "bbbbbbbbbb", startedAt: "2026-01-02T00:00:00Z" }), new Map([["EV-001", PNG]]));
+
+  assert.equal(s.delete("aaaaaaaaaa"), true);
+  assert.equal(s.get("aaaaaaaaaa"), undefined);
+  assert.equal(s.screenshots("aaaaaaaaaa").size, 0);
+  assert.equal(s.delete("aaaaaaaaaa"), false, "deleting twice reports that nothing was removed");
+
+  assert.equal(s.delete("nope"), false);
+  assert.deepEqual(s.list().map((r) => r.id), ["bbbbbbbbbb"], "other runs are untouched");
+  s.close();
+});
+
 test("store: the database file is owner-only", { skip: process.platform === "win32" }, () => {
   const path = join(mkdtempSync(join(tmpdir(), "al-db-")), "sub", "a.db");
   const s = new RunStore(path);

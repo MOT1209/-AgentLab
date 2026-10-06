@@ -265,10 +265,13 @@ Task type `explore`. Each step: observe → ask the LLM → parse JSON → **val
 | `evidenceDir` | none | Absolute path. If set, evidence files and `result.json` are written there. Set by the caller, never by the model. |
 | `screen` | none | `{ width, height }`; coordinates are bounds-checked if given |
 | `captureScreenshots` | true | Stored as evidence; never sent to the LLM |
+| `allowSensitiveActions` | false | Allow taps that land on a paid or destructive control. Off by default (see below). |
 
 **Actions the model may request** (nothing else exists): `LAUNCH_APP` `STOP_APP` `TAP` `TYPE` `SWIPE` `BACK` `HOME` `SCREENSHOT` `WAIT` `GET_UI` `GET_LOGS` `END_TEST`.
 
 **Safety boundary.** The model returns one JSON object per turn. `validateDecision` is the only way that output becomes an action: unknown actions, bad parameters and out-of-range coordinates are rejected, unknown keys are ignored. The executor is an exhaustive `switch` over `Device` methods. There is no shell, arbitrary-ADB, file or network action, and the model cannot name a package; launch/stop act only on the app configured in the task.
+
+**Paid and destructive taps are refused.** A `TAP` whose target sits on an element whose label, description or resource id reads as buy / pay / subscribe / delete account / factory reset / uninstall (English, German, Arabic) is **not executed**. It is recorded in the action log as `SENSITIVE_ACTION_BLOCKED` and the model is told why, so it can choose something else. The check is deterministic, never the model. Set `allowSensitiveActions: true` on the payload if you really want those taps. It matches element centres, so it is keyword-based and can be fooled by an unusual label or by a free-coordinate tap — see [known issues](.claude/project-memory/known-issues.md).
 
 **Results.** An `ExplorationResult` (status, steps, findings, evidence, action log, telemetry incl. tokens, timestamps) is returned in `result.children[0].details`. Statuses: `PASSED`, `FAILED`, `BLOCKED`, `CANCELLED`, `TIMEOUT`, `MAX_STEPS_REACHED`, `BUDGET_EXCEEDED`, `ERROR`.
 
@@ -362,5 +365,4 @@ AgentLab is for testing applications and games you own or are authorized to test
 
 ## License
 
-MIT, see [LICENSE](LICENSE).
-"# -AgentLab" 
+MIT, see [LICENSE](LICENSE). 

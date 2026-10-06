@@ -77,6 +77,9 @@ export class DeviceManager {
     return this.registry.get(id)?.device;
   }
 
+  /** Serials currently being health-checked by a concurrent discover() call. Prevents double registration. */
+  private readonly inflight = new Set<string>();
+
   /** Registers devices reported by a discovery source that are ready and not yet known. */
   async discover(
     discovery: DeviceDiscovery,
@@ -86,22 +89,27 @@ export class DeviceManager {
     const skipped: DiscoveredDevice[] = [];
     const rejected: RejectedDevice[] = [];
     for (const d of await discovery.discover()) {
-      if (this.registry.has(d.serial)) {
+      if (this.registry.has(d.serial) || this.inflight.has(d.serial)) {
         skipped.push(d);
         continue;
       }
-      // discovery -> health check -> registry. Unhealthy devices never enter the registry.
-      const device = create(d);
-      const health = await deepHealthCheck(device, d.state);
-      if (!health.healthy) {
-        rejected.push({ serial: d.serial, state: normalizeAdbState(d.state), reason: health.errors[0] ?? "health check failed", health });
-        continue;
+      this.inflight.add(d.serial);
+      try {
+        // discovery -> health check -> registry. Unhealthy devices never enter the registry.
+        const device = create(d);
+        const health = await deepHealthCheck(device, d.state);
+        if (!health.healthy) {
+          rejected.push({ serial: d.serial, state: normalizeAdbState(d.state), reason: health.errors[0] ?? "health check failed", health });
+          continue;
+        }
+        const opts: RegisterOptions = { source: adbSourceOf(d.serial), serial: d.serial };
+        const model = health.model ?? d.model;
+        if (model) opts.model = model;
+        if (health.androidVersion) opts.androidVersion = health.androidVersion;
+        added.push(this.addDevice(device, opts));
+      } finally {
+        this.inflight.delete(d.serial);
       }
-      const opts: RegisterOptions = { source: adbSourceOf(d.serial), serial: d.serial };
-      const model = health.model ?? d.model;
-      if (model) opts.model = model;
-      if (health.androidVersion) opts.androidVersion = health.androidVersion;
-      added.push(this.addDevice(device, opts));
     }
     return { added, skipped, rejected };
   }

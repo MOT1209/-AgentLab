@@ -5,7 +5,14 @@ on:
   pull_request:
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Windows is in the matrix because most of the suite runs there too, and a green ubuntu-only
+    # CI hides portability bugs (it did: path separators and POSIX-only fixtures). The simulated-adb
+    # tests skip themselves on win32 with a reason; see test/support/fake-adb.ts.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

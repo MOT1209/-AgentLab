@@ -33,6 +33,12 @@ export interface ExplorationTask {
   vision?: boolean;
   /** After the run, replay the steps that led to each verified crash to see whether it happens again. */
   confirmCrashes?: boolean;
+  /**
+   * Allow taps whose target element reads as a destructive or paid control (buy, subscribe,
+   * delete account, factory reset, uninstall). Off by default: the exploration agent refuses
+   * those taps so it cannot spend money or wipe app data just because a screen offered the button.
+   */
+  allowSensitiveActions?: boolean;
 }
 
 const PKG = /^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$/;
@@ -101,12 +107,12 @@ export function parseExplorationTask(payload: unknown): { ok: true; task: Explor
     if (!pricing) errors.push("pricing must be {inputPerMTok, outputPerMTok} (USD per million tokens, 0..100000)");
   }
   if (maxCostUsd !== undefined && payload.pricing === undefined) errors.push("maxCostUsd needs pricing: there is no built-in price table");
-  for (const k of ["vision", "confirmCrashes"] as const) if (payload[k] !== undefined && typeof payload[k] !== "boolean") errors.push(`${k} must be a boolean`);
+  for (const k of ["vision", "confirmCrashes", "allowSensitiveActions"] as const) if (payload[k] !== undefined && typeof payload[k] !== "boolean") errors.push(`${k} must be a boolean`);
   if (payload.captureScreenshots !== undefined && typeof payload.captureScreenshots !== "boolean") errors.push("captureScreenshots must be a boolean");
 
   if (errors.length > 0 || !objective) return { ok: false, errors };
   return {
     ok: true,
-    task: { objective, ...(app ? { app } : {}), maxSteps, maxLlmCalls, timeoutMs, ...(evidenceDir ? { evidenceDir } : {}), ...(screen ? { screen } : {}), captureScreenshots: payload.captureScreenshots !== false, ...(maxCostUsd !== undefined ? { maxCostUsd } : {}), ...(pricing ? { pricing } : {}), ...(payload.vision === true ? { vision: true } : {}), ...(payload.confirmCrashes === true ? { confirmCrashes: true } : {}) },
+    task: { objective, ...(app ? { app } : {}), maxSteps, maxLlmCalls, timeoutMs, ...(evidenceDir ? { evidenceDir } : {}), ...(screen ? { screen } : {}), captureScreenshots: payload.captureScreenshots !== false, ...(maxCostUsd !== undefined ? { maxCostUsd } : {}), ...(pricing ? { pricing } : {}), ...(payload.vision === true ? { vision: true } : {}), ...(payload.confirmCrashes === true ? { confirmCrashes: true } : {}), ...(payload.allowSensitiveActions === true ? { allowSensitiveActions: true } : {}) },
   };
 }

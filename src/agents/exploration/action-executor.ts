@@ -2,7 +2,7 @@ import { Device, DeviceError, UiNode } from "../../device/types.js";
 import { AgentAction } from "./actions.js";
 import type { EvidenceStore } from "./evidence.js";
 
-export type ActionErrorCode = "UNSUPPORTED_ACTION" | "DEVICE_ERROR" | "ACTION_FAILED";
+export type ActionErrorCode = "UNSUPPORTED_ACTION" | "DEVICE_ERROR" | "ACTION_FAILED" | "SENSITIVE_ACTION_BLOCKED";
 
 export interface ActionOutcome {
   ok: boolean;

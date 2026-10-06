@@ -14,6 +14,7 @@ import { detectCrash, Finding, FindingLog, hasVerifiedFailure, relevantLogLines 
 import { Observation, summarizeUi } from "./observation.js";
 import { buildUserMessage } from "./prompt.js";
 import { ActionRecord, ExplorationResult, ExplorationStatus, ExplorationTelemetry, toTaskStatus } from "./result.js";
+import { sensitiveTapTarget } from "./sensitive-actions.js";
 import { ExplorationTask, parseExplorationTask } from "./task.js";
 
 export type Logger = (event: string, data?: Record<string, unknown>) => void;
@@ -312,7 +313,14 @@ export async function runExploration(deps: ExplorationDeps): Promise<Exploration
 
       const step = ++tel.actions;
       log("action", { agentId, step, action: decision.action.action, reason: decision.reason.slice(0, 120) });
-      const result = await executor.execute(decision.action, step, ctrl.signal);
+
+      // Deterministic guard, never the model: refuse a tap that lands on a paid or destructive control.
+      // Recorded like any other failed action so the step, the action log and the model all see it.
+      const blocked = decision.action.action === "TAP" && !task.allowSensitiveActions ? sensitiveTapTarget(obs.ui, decision.action.target) : undefined;
+      const result: ActionOutcome = blocked
+        ? { ok: false, detail: `refused: that control looks like a ${blocked.category} action ("${blocked.label}"). Tapping it is blocked for this run; test around it instead.`, errorCode: "SENSITIVE_ACTION_BLOCKED", deviceError: false, evidenceIds: [] }
+        : await executor.execute(decision.action, step, ctrl.signal);
+      if (blocked) log("action_blocked", { agentId, step, category: blocked.category });
       if (!result.ok) {
         // A failed action keeps the log tail as evidence, so a launch failure can be diagnosed afterwards.
         try {

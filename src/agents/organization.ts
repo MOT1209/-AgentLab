@@ -58,7 +58,7 @@ const SPEC: readonly MainSpec[] = [
     description: "Explores the application without a fixed script to find unexpected defects.",
     subs: [
       { name: "Exploration Agent", role: "exploration", description: "Navigates the app autonomously and maps reachable screens.", capabilities: ["launch_app", "stop_app", "tap", "type", "swipe", "press_key", "screenshot", "inspect_ui", "logs"] },
-      { name: "Edge Case Agent", role: "edge-case-testing", description: "Tries unusual inputs, sequences and boundary values.", capabilities: ["tap", "type", "screenshot", "logs"] },
+      { name: "Edge Case Agent", role: "edge-case-testing", description: "Tries unusual inputs, sequences and boundary values.", capabilities: ["launch_app", "stop_app", "tap", "type", "swipe", "press_key", "screenshot", "inspect_ui", "logs"] },
     ],
   },
   {

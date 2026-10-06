@@ -6,3 +6,5 @@ providers.local.json
 out/
 *.stackdump
 review-report.html
+# browser-automation artefacts: console logs can contain data from the app under test
+.playwright-mcp/

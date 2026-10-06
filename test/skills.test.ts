@@ -389,7 +389,7 @@ test("sync: writes missing files, is idempotent, and detects drift and hand edit
 
     const file = join(root, ".claude/skills/agentlab-core/SKILL.md");
     writeFileSync(file, readFileSync(file, "utf8").replace("## Purpose", "## Purpose (edited)"));
-    assert.ok(find(validateFiles(system.registry, root), /agentlab-core\/SKILL\.md: edited by hand/));
+    assert.ok(find(validateFiles(system.registry, root), /agentlab-core[/\\]SKILL\.md: edited by hand/));
     applySync(planSync(system.registry, root));
     assert.deepEqual(validateFiles(system.registry, root), []);
   } finally {
@@ -429,7 +429,7 @@ test("sync: .claude and .agent metadata that disagree are reported, and orphans 
 test("sync: manual skills must exist and match the catalog", () => {
   const root = tmp();
   try {
-    assert.ok(find(validateFiles(system.registry, root), /ai-testing-lab\/SKILL\.md: manual skill file is missing/));
+    assert.ok(find(validateFiles(system.registry, root), /ai-testing-lab[/\\]SKILL\.md: manual skill file is missing/));
     mkdirSync(join(root, ".claude/skills/ai-testing-lab"), { recursive: true });
     writeFileSync(join(root, ".claude/skills/ai-testing-lab/SKILL.md"), "---\nname: wrong-name\ndescription: Not the catalog text.\n---\n");
     const problems = validateFiles(system.registry, root);

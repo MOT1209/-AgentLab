@@ -10,6 +10,7 @@ import { EvidenceStore } from "../src/agents/exploration/evidence.js";
 import { detectCrash } from "../src/agents/exploration/findings.js";
 import { summarizeUi } from "../src/agents/exploration/observation.js";
 import { runExploration } from "../src/agents/exploration/exploration-agent.js";
+import { sensitiveTerm, sensitiveTapTarget } from "../src/agents/exploration/sensitive-actions.js";
 import { parseExplorationTask, type ExplorationTask } from "../src/agents/exploration/task.js";
 import type { ActionName } from "../src/agents/exploration/actions.js";
 
@@ -327,4 +328,86 @@ test("AI-suggested findings are marked unverified and never fail the run", async
   const r = await run(llm);
   assert.equal(r.status, "PASSED");
   assert.deepEqual(r.findings.map((f) => [f.source, f.severity]), [["AI_OBSERVATION", "HIGH"]]);
+});
+
+// ---------- sensitive tap guard ----------
+
+test("sensitiveTerm catches the category from label, description and resource id", () => {
+  assert.equal(sensitiveTerm("Buy now"), "purchase");
+  assert.equal(sensitiveTerm("Pay with card"), "payment");
+  assert.equal(sensitiveTerm("Subscribe"), "subscribe");
+  assert.equal(sensitiveTerm("Delete account"), "delete-account");
+  assert.equal(sensitiveTerm("Factory reset"), "factory-reset");
+  assert.equal(sensitiveTerm("Uninstall"), "uninstall");
+  // German and Arabic
+  assert.equal(sensitiveTerm("Jetzt kaufen"), "purchase");
+  assert.equal(sensitiveTerm("Konto löschen"), "delete-account");
+  assert.equal(sensitiveTerm("اشترك"), "subscribe");
+  assert.equal(sensitiveTerm("إلغاء التثبيت"), "uninstall");
+  // harmless labels must not match
+  for (const safe of ["Settings", "Open menu", "cart", "basket", "Back", "Play", "Search"]) assert.equal(sensitiveTerm(safe), undefined, safe);
+});
+
+test("Arabic terms are not substring hits of each other", () => {
+  // Regression: "اشتر" (buy) is a prefix of "اشترك" (subscribe) and of "الاشتراك" (the subscription),
+  // so a naive alternation reports every subscribe button as a purchase.
+  assert.equal(sensitiveTerm("اشترك"), "subscribe");
+  assert.equal(sensitiveTerm("الاشتراك"), "subscribe");
+  assert.equal(sensitiveTerm("الشراء"), "purchase");
+  assert.equal(sensitiveTerm("شراء"), "purchase");
+  assert.equal(sensitiveTerm("اشتر الآن"), "purchase");
+  // a plain Arabic word with no sensitive term in it stays clean
+  assert.equal(sensitiveTerm("الإعدادات"), undefined);
+  assert.equal(sensitiveTerm("فتح القائمة"), undefined);
+});
+
+test("sensitiveTerm matches camelCase and snake_case resource ids alike", () => {
+  // Android ids are usually camelCase; \b does not fire inside a hump, so this needs the camelCase rule.
+  for (const id of ["buyButton", "btnBuyNow", "btnPurchase", "btnPayNow", "buy_button", "btn/buy", "UNINSTALL"]) {
+    assert.ok(sensitiveTerm(id), `expected ${id} to match`);
+  }
+  assert.equal(sensitiveTerm("btnBack"), undefined);
+  assert.equal(sensitiveTerm("settingsIcon"), undefined);
+});
+
+test("sensitiveTapTarget matches element centers and ignores other elements", () => {
+  const ui = summarizeUi([node("Buy", 100, 200, 300, 280), node("Open menu", 500, 600, 700, 700)]).elements;
+  assert.deepEqual(sensitiveTapTarget(ui, { x: 200, y: 240 }), { category: "purchase", label: "Buy" });
+  assert.equal(sensitiveTapTarget(ui, { x: 600, y: 650 }), undefined);
+  assert.equal(sensitiveTapTarget(ui, { x: 12, y: 340 }), undefined, "far from any element center");
+  assert.equal(sensitiveTapTarget(undefined, { x: 200, y: 240 }), undefined);
+});
+
+test("a tap on a paid or destructive control never reaches the device and is reported to the model", async () => {
+  const device = new MockDevice("D");
+  device.setUi([node("Buy", 100, 200, 300, 280), node("Open menu", 500, 600, 700, 700)]);
+  const llm = MockProvider.scripted([tap(200, 240), tap(600, 650), end("moved on")]);
+  const r = await run(llm, device);
+
+  assert.deepEqual(device.trace, ["tap:600,650"], "the Buy tap must not be executed");
+  assert.equal(r.status, "PASSED");
+  const blocked = r.actionLog[0]!;
+  assert.deepEqual([blocked.action, blocked.ok, blocked.errorCode], ["TAP", false, "SENSITIVE_ACTION_BLOCKED"]);
+  assert.match(blocked.detail, /refused.*purchase/s);
+  // the model is told why, so it can choose a different element
+  assert.match(llm.requests[1]!.messages[0]!.content, /refused/);
+});
+
+test("allowSensitiveActions lets the same tap through", async () => {
+  const device = new MockDevice("D");
+  device.setUi([node("Buy", 100, 200, 300, 280)]);
+  const llm = MockProvider.scripted([tap(200, 240), end("bought")]);
+  const r = await run(llm, device, { allowSensitiveActions: true });
+
+  assert.deepEqual(device.trace, ["tap:200,240"]);
+  assert.deepEqual([r.actionLog[0]!.ok, r.actionLog[0]!.errorCode], [true, undefined]);
+});
+
+test("allowSensitiveActions is off unless the caller asks for it", () => {
+  const off = parseExplorationTask({ objective: "o" });
+  assert.ok(off.ok && off.task.allowSensitiveActions === undefined);
+  const on = parseExplorationTask({ objective: "o", allowSensitiveActions: true });
+  assert.ok(on.ok && on.task.allowSensitiveActions === true);
+  const bad = parseExplorationTask({ objective: "o", allowSensitiveActions: "yes" });
+  assert.ok(!bad.ok && bad.errors.some((e) => e.includes("allowSensitiveActions")));
 });

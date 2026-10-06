@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { AdbDevice } from "../src/device/adb-device.js";
 import { MockDevice } from "../src/device/mock-device.js";
 import { smokeHandler } from "../src/agents/behaviors/smoke.js";
-import { createFakeAdb, FAKE_SERIAL } from "./support/fake-adb.js";
+import { createFakeAdb, FAKE_ADB_SKIP, FAKE_SERIAL } from "./support/fake-adb.js";
 
 /** A tiny adb stand-in: `install` sleeps, everything else prints the argument line. */
 function scriptedAdb(body: string): string {
@@ -17,7 +17,7 @@ function scriptedAdb(body: string): string {
   return bin;
 }
 
-test("adb: install has its own, longer timeout; other commands keep the short one", async () => {
+test("adb: install has its own, longer timeout; other commands keep the short one", { skip: FAKE_ADB_SKIP }, async () => {
   const bin = scriptedAdb(`case "$*" in *install*) sleep 1; echo Success ;; *) sleep 1 ;; esac`);
   const d = new AdbDevice("X", bin, { defaultMs: 200, installMs: 5_000 });
   await d.install("app.apk"); // 1s > defaultMs, but within installMs
@@ -29,7 +29,7 @@ test("adb: an option-looking apk path is refused", async () => {
   await assert.rejects(d.install("-g"), /invalid apk path/);
 });
 
-test("adb: one failed command does not mark the device ERROR; a lost device does", async () => {
+test("adb: one failed command does not mark the device ERROR; a lost device does", { skip: FAKE_ADB_SKIP }, async () => {
   const flaky = scriptedAdb(`echo "java.lang.RuntimeException: uiautomator busy" >&2; exit 1`);
   const d = new AdbDevice("X", flaky);
   await assert.rejects(d.ui());
@@ -40,7 +40,7 @@ test("adb: one failed command does not mark the device ERROR; a lost device does
   assert.equal(g.state(), "ERROR");
 });
 
-test("adb: TYPE keeps symbols, quotes safely, and refuses non-ASCII without ADBKeyboard instead of dropping text", async () => {
+test("adb: TYPE keeps symbols, quotes safely, and refuses non-ASCII without ADBKeyboard instead of dropping text", { skip: FAKE_ADB_SKIP }, async () => {
   const fake = createFakeAdb();
   const d = new AdbDevice(FAKE_SERIAL, fake.bin);
   await d.type("it's a+b!#1");
