@@ -1,4 +1,5 @@
-import type { LlmProvider, LlmResponse } from "../../providers/types.js";
+import { costUsd, type Pricing } from "../../providers/pricing.js";
+import type { LlmImage, LlmProvider, LlmResponse } from "../../providers/types.js";
 import { ProviderError } from "../../providers/types.js";
 import { AgentDecision, DECISION_SCHEMA } from "./actions.js";
 import { parseJsonObject, validateDecision, ValidationLimits } from "./action-validator.js";
@@ -31,9 +32,14 @@ export async function requestDecision(opts: {
    * returns, so the last call before the ceiling can overshoot it.
    */
   maxTokens?: number;
+  /** Optional money ceiling for the whole run (needs pricing). Like tokens, the last call can overshoot it. */
+  maxCostUsd?: number;
+  pricing?: Pricing;
+  /** Attached to the first message only (vision). */
+  images?: readonly LlmImage[];
 }): Promise<DecisionOutcome> {
   const { llm, limits, signal, telemetry } = opts;
-  const messages: { role: "user" | "assistant"; content: string }[] = [{ role: "user", content: opts.userMessage }];
+  const messages: { role: "user" | "assistant"; content: string; images?: readonly LlmImage[] }[] = [{ role: "user", content: opts.userMessage, ...(opts.images?.length ? { images: opts.images } : {}) }];
   let lastErrors: string[] = [];
 
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -43,6 +49,9 @@ export async function requestDecision(opts: {
     }
     if (opts.maxTokens !== undefined && telemetry.inputTokens + telemetry.outputTokens >= opts.maxTokens) {
       return { ok: false, kind: "BUDGET", message: `Token limit of ${opts.maxTokens} reached (${telemetry.inputTokens + telemetry.outputTokens} used).` };
+    }
+    if (opts.maxCostUsd !== undefined && (telemetry.costUsd ?? 0) >= opts.maxCostUsd) {
+      return { ok: false, kind: "BUDGET", message: `Cost limit of $${opts.maxCostUsd} reached (about $${(telemetry.costUsd ?? 0).toFixed(4)} used).` };
     }
     let res: LlmResponse;
     telemetry.llmCalls++;
@@ -64,6 +73,7 @@ export async function requestDecision(opts: {
     }
     telemetry.inputTokens += res.usage.inputTokens;
     telemetry.outputTokens += res.usage.outputTokens;
+    if (opts.pricing) telemetry.costUsd = costUsd({ inputTokens: telemetry.inputTokens, outputTokens: telemetry.outputTokens }, opts.pricing);
     if (res.refused) {
       telemetry.providerErrors++;
       return { ok: false, kind: "PROVIDER_ERROR", message: "provider refused the request" };

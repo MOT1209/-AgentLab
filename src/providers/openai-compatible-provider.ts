@@ -33,7 +33,14 @@ export class OpenAICompatibleProvider implements LlmProvider {
     const body = {
       model: this.model,
       max_tokens: req.maxTokens ?? this.config.maxTokens ?? DEFAULT_MAX_TOKENS,
-      messages: [...(req.system ? [{ role: "system", content: req.system }] : []), ...req.messages],
+      messages: [
+        ...(req.system ? [{ role: "system", content: req.system }] : []),
+        ...req.messages.map((m) =>
+          m.images?.length
+            ? { role: m.role, content: [{ type: "text", text: m.content }, ...m.images.map((i) => ({ type: "image_url", image_url: { url: `data:${i.mediaType};base64,${i.dataBase64}` } }))] }
+            : { role: m.role, content: m.content },
+        ),
+      ],
       ...(req.jsonSchema ? { response_format: { type: "json_schema", json_schema: { name: req.jsonSchema.name, schema: req.jsonSchema.schema } } } : {}),
     };
     let res: Response;

@@ -13,6 +13,8 @@ export interface ExplorationTelemetry {
   inputTokens: number;
   outputTokens: number;
   durationMs: number;
+  /** Estimated from token usage and the caller's pricing; absent when no pricing was given. */
+  costUsd?: number;
 }
 
 export interface ActionRecord {
@@ -23,6 +25,8 @@ export interface ActionRecord {
   detail: string;
   errorCode?: string;
   evidenceIds: string[];
+  /** The action as executed, so a run can be replayed and reported as reproduction steps. */
+  params?: Record<string, unknown>;
 }
 
 export interface ExplorationResult {

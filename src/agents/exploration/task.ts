@@ -1,3 +1,4 @@
+import { parsePricing, type Pricing } from "../../providers/pricing.js";
 import type { AppContext } from "./observation.js";
 
 export const DEFAULT_MAX_STEPS = 20;
@@ -24,6 +25,14 @@ export interface ExplorationTask {
   evidenceDir?: string;
   screen?: { width: number; height: number };
   captureScreenshots: boolean;
+  /** Stop with BUDGET_EXCEEDED once the estimated cost reaches this many USD. Needs `pricing`. One call can overshoot it. */
+  maxCostUsd?: number;
+  /** USD per million tokens, stated by the caller (there is no built-in price table). */
+  pricing?: Pricing;
+  /** Send the latest screenshot to the model each step. Off by default: costs more and the pixels cannot be redacted. */
+  vision?: boolean;
+  /** After the run, replay the steps that led to each verified crash to see whether it happens again. */
+  confirmCrashes?: boolean;
 }
 
 const PKG = /^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$/;
@@ -80,11 +89,24 @@ export function parseExplorationTask(payload: unknown): { ok: true; task: Explor
       screen = { width: s.width as number, height: s.height as number };
     } else errors.push("screen must be {width, height} positive integers");
   }
+  let maxCostUsd: number | undefined;
+  if (payload.maxCostUsd !== undefined) {
+    const c = payload.maxCostUsd;
+    if (typeof c === "number" && Number.isFinite(c) && c > 0 && c <= 1000) maxCostUsd = c;
+    else errors.push("maxCostUsd must be a number in (0, 1000]");
+  }
+  let pricing: Pricing | undefined;
+  if (payload.pricing !== undefined) {
+    pricing = parsePricing(payload.pricing);
+    if (!pricing) errors.push("pricing must be {inputPerMTok, outputPerMTok} (USD per million tokens, 0..100000)");
+  }
+  if (maxCostUsd !== undefined && payload.pricing === undefined) errors.push("maxCostUsd needs pricing: there is no built-in price table");
+  for (const k of ["vision", "confirmCrashes"] as const) if (payload[k] !== undefined && typeof payload[k] !== "boolean") errors.push(`${k} must be a boolean`);
   if (payload.captureScreenshots !== undefined && typeof payload.captureScreenshots !== "boolean") errors.push("captureScreenshots must be a boolean");
 
   if (errors.length > 0 || !objective) return { ok: false, errors };
   return {
     ok: true,
-    task: { objective, ...(app ? { app } : {}), maxSteps, maxLlmCalls, timeoutMs, ...(evidenceDir ? { evidenceDir } : {}), ...(screen ? { screen } : {}), captureScreenshots: payload.captureScreenshots !== false },
+    task: { objective, ...(app ? { app } : {}), maxSteps, maxLlmCalls, timeoutMs, ...(evidenceDir ? { evidenceDir } : {}), ...(screen ? { screen } : {}), captureScreenshots: payload.captureScreenshots !== false, ...(maxCostUsd !== undefined ? { maxCostUsd } : {}), ...(pricing ? { pricing } : {}), ...(payload.vision === true ? { vision: true } : {}), ...(payload.confirmCrashes === true ? { confirmCrashes: true } : {}) },
   };
 }

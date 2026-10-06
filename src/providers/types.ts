@@ -1,9 +1,17 @@
 export const PROVIDER_KINDS = ["anthropic", "openai-compatible", "mock"] as const;
 export type ProviderKind = (typeof PROVIDER_KINDS)[number];
 
+export interface LlmImage {
+  mediaType: "image/png" | "image/jpeg";
+  /** Base64, no data: prefix. */
+  dataBase64: string;
+}
+
 export interface LlmMessage {
   role: "user" | "assistant";
   content: string;
+  /** Only honoured on user messages, and only by providers whose model accepts images. */
+  images?: readonly LlmImage[];
 }
 
 export interface LlmRequest {

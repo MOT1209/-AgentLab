@@ -13,6 +13,10 @@ export interface Finding {
   agentId: string;
   step: number;
   source: FindingSource;
+  /** Verified findings: the actions that led here, in order, for a human to reproduce. */
+  reproSteps?: string[];
+  /** Set only when crash confirmation ran: did replaying those steps crash the app again? */
+  reproduced?: "CONFIRMED" | "NOT_REPRODUCED" | "INCONCLUSIVE";
 }
 
 export interface CrashSignal {
@@ -111,6 +115,12 @@ export class FindingLog {
     const finding: Finding = { id: this.nextId(), detectedAt: new Date(this.now()).toISOString(), agentId: this.agentId, ...f };
     this.list.push(finding);
     return finding;
+  }
+
+  /** Adds facts to an existing finding (repro steps, confirmation result). */
+  annotate(id: string, patch: Partial<Pick<Finding, "reproSteps" | "reproduced">>): void {
+    const f = this.list.find((x) => x.id === id);
+    if (f) Object.assign(f, patch);
   }
 
   all(): Finding[] {

@@ -1,4 +1,5 @@
 import type { DeviceState, UiNode } from "../../device/types.js";
+import { redactSensitive } from "./redact.js";
 
 export interface AppContext {
   packageName?: string;
@@ -23,7 +24,7 @@ export interface Observation {
   timestamp: string;
   deviceState: DeviceState;
   app: { packageName?: string; foregroundPackage?: string };
-  /** Reference only; image bytes are never sent to the model. */
+  /** Reference only. Image bytes go to the model only when the task opts in to vision (see ExplorationTask.vision). */
   screenshotRef?: string;
   ui?: UiElement[];
   uiTruncated?: boolean;
@@ -55,6 +56,8 @@ export function summarizeUi(nodes: readonly UiNode[]): { elements: UiElement[]; 
   return { elements, truncated: useful.length > MAX_UI_ELEMENTS, ...(foreground ? { foreground } : {}) };
 }
 
+const redactElement = (e: UiElement): UiElement => ({ ...e, ...(e.text ? { text: redactSensitive(e.text) } : {}), ...(e.desc ? { desc: redactSensitive(e.desc) } : {}) });
+
 /** What goes into the prompt for one observation. Small, text-only, no binary. */
 export function observationForPrompt(o: Observation): Record<string, unknown> {
   return {
@@ -64,8 +67,8 @@ export function observationForPrompt(o: Observation): Record<string, unknown> {
     ...(o.screenshotRef ? { screenshotRef: o.screenshotRef } : {}),
     ...(o.recentAction ? { recentAction: o.recentAction } : {}),
     ...(o.actionResult ? { actionResult: o.actionResult } : {}),
-    ...(o.ui ? { ui: o.ui, uiTruncated: o.uiTruncated ?? false } : { ui: "unavailable" }),
-    ...(o.logLines && o.logLines.length > 0 ? { errorLogLines: o.logLines } : {}),
+    ...(o.ui ? { ui: o.ui.map(redactElement), uiTruncated: o.uiTruncated ?? false } : { ui: "unavailable" }),
+    ...(o.logLines && o.logLines.length > 0 ? { errorLogLines: o.logLines.map(redactSensitive) } : {}),
     ...(o.errors.length > 0 ? { errors: o.errors } : {}),
   };
 }
