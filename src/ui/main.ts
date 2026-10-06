@@ -1,5 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { execFile } from "node:child_process";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { RunStore } from "../store/run-store.js";
 import { UiApp } from "./app.js";
 import { createUiServer } from "./server.js";
 
@@ -8,7 +11,15 @@ const portArg = argv.indexOf("--port");
 const port = Number(portArg >= 0 ? argv[portArg + 1] : (process.env.AGENTLAB_UI_PORT ?? 4173));
 const token = randomBytes(16).toString("hex");
 
-const app = new UiApp(process.env.ADB_PATH ? { adbPath: process.env.ADB_PATH } : {});
+// History lives in the user's home, not the project folder: it holds screenshots of the app under test.
+const dbPath = process.env.AGENTLAB_DB ?? join(homedir(), ".agentlab", "agentlab.db");
+let store: RunStore | undefined;
+try {
+  store = new RunStore(dbPath);
+} catch (e) {
+  console.warn(`Run history is disabled (could not open ${dbPath}: ${e instanceof Error ? e.message : String(e)}).`);
+}
+const app = new UiApp({ ...(process.env.ADB_PATH ? { adbPath: process.env.ADB_PATH } : {}), ...(store ? { store } : {}) });
 const server = createUiServer(app, { token });
 server.on("error", (e: NodeJS.ErrnoException) => {
   console.error(e.code === "EADDRINUSE" ? `Port ${port} is already in use. Try:  npm run ui -- --port 4174` : `Server error: ${e.message}`);
@@ -28,5 +39,6 @@ server.listen(port, "127.0.0.1", () => {
 });
 process.once("SIGINT", () => {
   server.close();
+  store?.close();
   process.exit(0);
 });

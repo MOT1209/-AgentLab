@@ -53,14 +53,15 @@ Full 36-agent list: [`.claude/skills/ai-testing-lab/knowledge/agents.md`](.claud
 | `MAIN-05-A` Exploration Agent (LLM-driven loop) | Built, tested (mock device, simulated adb, scripted LLM). **Never run on a real device or with a live LLM.** |
 | The other 22 sub-agents | Registered, **no behavior**. They return `BLOCKED`. |
 | Local web UI (`npm run ui`): demo run verified in a headless browser; real-device mode never run | Built |
-| Persistence, cost caps, vision, multi-user/remote access | **Not built** |
+| Run history (SQLite), HTML report, money cost cap, vision option, crash confirmation by replay | Built, tested with fakes/mocks only. Never run on a real device or with a live model |
+| Multi-user/remote access | **Not built** |
 
 Limitations that matter in practice:
 
 - **The LLM does not see pixels.** The Exploration Agent gets the UI hierarchy as text (labels and tap targets). Games, WebViews and canvases expose little or none, so exploration there will be weak.
 - **UI text and log lines are sent to your LLM provider.** Do not point it at an app showing real personal data unless that is acceptable.
-- **No spending cap.** A run is bounded by `maxSteps` and `timeoutMs`; tokens are counted in telemetry but not limited.
-- State (leases, assignments, evidence, messages) is in memory only.
+- **Spending cap needs your prices.** There is no built-in price table. Give `maxCostUsd` plus `pricing` (USD per million tokens) and the run stops with `BUDGET_EXCEEDED`; one call can overshoot.
+- Leases, assignments and the message bus are in memory. Finished real runs from the web UI are saved to SQLite (`~/.agentlab/agentlab.db`, or `AGENTLAB_DB`), owner-only, because they contain screenshots and UI text of the app under test.
 
 Full list: [`.claude/project-memory/known-issues.md`](.claude/project-memory/known-issues.md).
 
@@ -99,6 +100,13 @@ The UI is Arabic or English (switch at the top). Safety properties: it listens o
 `npm run explore -- --mock` (offline demo) or `npm run explore -- --package com.example.app` (real device + `ANTHROPIC_API_KEY`). It writes `out/<task-id>/report.json` and the screenshots as PNG files. Otherwise AgentLab is a library (`src/index.ts`).
 
 ### Web UI details
+
+**Advanced options (real exploration):**
+
+- *Cost cap*: enter the two prices from your provider and a USD cap. Without both prices the cap is ignored.
+- *Crash confirmation* (on by default): after the run, the steps that led to each crash (max 3) are replayed once. A finding is marked "happened again", "did not recur" (possibly intermittent; still a failure) or "could not be confirmed". Every verified crash lists its reproduction steps either way.
+- *Vision* (off by default): sends each screenshot to the model. Costs more, and pixels cannot be redacted. UI text and log lines are always partly masked before leaving the machine (emails, long numbers, tokens, phone numbers); this is best effort, not a guarantee.
+- *History and HTML report*: past runs are listed in the page; each has a self-contained HTML report (no scripts, screenshots embedded) you can open and share. It contains the app's screenshots: check them before sharing.
 
 There is one web UI (`npm run ui`, Arabic/English). Besides the exploration test it offers **presets** for OpenAI-compatible providers (Groq, OpenRouter, Ollama, ...) and a **smoke test** (install an APK, launch, crash check; no model or key needed) in real-device mode. Keys are typed into the page and kept in memory only.
 

@@ -2,7 +2,7 @@
 
 - AdbDevice never run on a real device/emulator. Verified: argument construction, simulated adb pipeline, real adb binary without a device — HIGH — open
 - Crash detection is a log-marker match (FATAL EXCEPTION, ANR in, Fatal signal, process died); not a classifier. Logcat is now cleared on LAUNCH_APP in the exploration agent only (smoke handler still does not) — MEDIUM — open
-- No persistence; tasks/evidence/messages live in memory only (MessageBus is bounded at 10k) — MEDIUM — open
+- Persistence: finished REAL web-UI runs are saved to SQLite (node:sqlite, experimental in Node 22); leases/assignments/message bus/library tasks are still in memory — LOW — open
 - Capabilities screen_recording, inspect_ui, network_control (and analysis ones) are declared but have no Device/tool implementation — MEDIUM — open
 - Only 2 of 24 SUB agents have behavior (MAIN-01-B smoke, MAIN-05-A explore); the rest report BLOCKED — LOW — open
 - No per-task timeout/cancellation in Agent.run — LOW — open
@@ -10,19 +10,17 @@
 - Leases and assignments are in memory only; a process crash loses them (a restarted run starts clean, which is safe, but history is lost) — LOW — open
 - Device capability list is declared per device (defaults to the 8 implemented); AdbDevice does not verify it — LOW — open
 - Providers are only tested with fakes; no live call to Anthropic/OpenAI-compatible endpoints has been made — MEDIUM — open
-- No cost accounting per provider or across runs; each exploration run is now bounded by its profile's maxLLMCalls/maxTokens, but there is no total budget over many runs and no money-denominated cap — MEDIUM — open
+- Cost: estimated from caller-supplied prices (no built-in table, prices can be wrong); no total budget across runs — MEDIUM — open
 - serverSideFallback request shape follows the SDK skill docs but is unverified live — LOW — open
 - Provider API keys are read from process env; no vault/secret-manager integration — LOW — open
 - Exploration agent has never run against a real device or a live LLM; swipe/pressKey/ui(uiautomator)/clearLogs/screencap only tested via simulated adb — HIGH — open
 - The model is blind to pixels: it only sees the UI hierarchy text. Games, WebViews and canvases expose little or no hierarchy, so exploration there will be weak — HIGH — open
 - UI text/log lines are sent to the LLM provider; apps showing personal data would leak it to that provider — MEDIUM — open
-- No cost cap in money terms (see maxCost above); steps, time, LLM calls and tokens are capped per run by the agent profile — MEDIUM — open
 - No back-off between LLM calls and no concurrency limit across the 12 MAIN agents (rate limits untested) — LOW — open
 - uiautomator dump can fail while an animation runs or on secure screens (FLAG_SECURE); the agent then sees "ui: unavailable" — LOW — open
 - Phase 4.5 real-device proof is still NOT done (no device/emulator here); the opt-in test (REAL_DEVICE_TEST=1) and the real-adb test (needs an adb binary) are skipped in CI-like runs — HIGH — open
 - Skill enforcement covers only AgentLab's own handlers/actions; generated .claude/.agent SKILL.md files are advisory and cannot be enforced — MEDIUM — by design
 - .agent/skills convention unverified (Antigravity docs and skills.sh were blocked); may need `.agents/` — LOW — open
-- No maxCost: provider pricing does not exist, so cost cannot be enforced (only tokens/LLM calls/steps/time) — MEDIUM — open
 - Token ceiling can be overshot by one model call (usage is known after the call) — LOW — open
 - MAIN-05-B (Edge Case Agent) declares only tap/type/screenshot/logs, so it cannot run the exploration handler; it holds the exploration skill but only SCREENSHOT/LOG_READ/DEVICE_INTERACT effectively. MAIN-10-A declares no device capability. Their definitions need extending before real behavior is added — LOW — open
 - Skill selection is keyword (substring) matching, no semantics; wrong or missed skills are possible — LOW — open
@@ -41,3 +39,5 @@
 - No linter is configured in this project (only tsc strict) — LOW — open
 - P1 fixes (unproven on real hardware): adb install timeout is 10 min (others 30s); only connection-loss errors set a device to ERROR; TYPE single-quotes ASCII (symbols kept) and non-ASCII needs the ADBKeyboard app (fails loudly otherwise, ADBKeyboard path never run on a device); smoke validates its payload, clears logs, uses package-scoped detectCrash and always stops the app — LOW — open until a real run
 - P1 still open: benchmark app with planted bugs vs adb monkey (needs a real device) — MEDIUM — open
+- P2 (all untested on real hardware/live models): vision request shapes follow the documented Anthropic/OpenAI image formats but never hit a live API; crash confirmation replays coordinates blindly (a layout change or timing makes a real crash look NOT_REPRODUCED); screenshots cannot be redacted; text redaction is regex best effort — MEDIUM — open
+- Run history has no retention policy or delete UI; the DB grows — LOW — open

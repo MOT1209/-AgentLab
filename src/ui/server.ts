@@ -107,6 +107,11 @@ export function createUiServer(app: UiApp, opts: UiServerOptions): Server {
         const num = (v: unknown) => (typeof v === "number" ? v : undefined);
         const started = app.startRun({
           mode: b.mode === "real" ? "real" : "demo",
+          ...(num(b.maxCostUsd) !== undefined ? { maxCostUsd: num(b.maxCostUsd)! } : {}),
+          ...(num(b.inputPrice) !== undefined ? { inputPrice: num(b.inputPrice)! } : {}),
+          ...(num(b.outputPrice) !== undefined ? { outputPrice: num(b.outputPrice)! } : {}),
+          ...(b.vision === true ? { vision: true } : {}),
+          ...(b.confirmCrashes === true ? { confirmCrashes: true } : {}),
           ...(b.test === "smoke" ? { test: "smoke" as const } : {}),
           ...(typeof b.apkPath === "string" ? { apkPath: b.apkPath } : {}),
           ...(typeof b.package === "string" ? { package: b.package } : {}),
@@ -125,6 +130,14 @@ export function createUiServer(app: UiApp, opts: UiServerOptions): Server {
         if (!r) return json(res, 404, { error: "No finished run." });
         return send(res, 200, JSON.stringify(r, null, 2), "application/json; charset=utf-8", { "content-disposition": 'attachment; filename="agentlab-report.json"' });
       }
+    }
+    const lang = url.searchParams.get("lang") === "en" ? "en" : "ar";
+    const reportMatch = /^\/api\/runs\/([a-f0-9]{10})\/report\.html$/.exec(url.pathname);
+    if ((reportMatch || url.pathname === "/api/run/report.html") && method === "GET") {
+      const nonce = randomBytes(16).toString("base64");
+      const html = app.reportHtml(reportMatch?.[1], lang, nonce);
+      if (!html) return json(res, 404, { error: "No such report." });
+      return send(res, 200, html, "text/html; charset=utf-8", { "content-security-policy": `default-src 'none'; img-src data:; style-src 'nonce-${nonce}'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'` });
     }
     const m = /^\/api\/run\/screenshot\/(EV-\d{3})$/.exec(url.pathname);
     if (m && method === "GET") {

@@ -56,7 +56,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .f{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:6px}
 .empty{color:var(--muted);text-align:center;padding:30px 10px}
 .kv{display:flex;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:13px;margin-top:8px}
-.hide{display:none}.w120{width:190px}.mt10{margin-top:10px}.mt12{margin-top:12px}.mt16{margin-top:16px}.m0{margin:0}.between{justify-content:space-between}.row>.pill{flex:0 0 auto}.row>h2{flex:1}
+.chk{display:flex;gap:8px;align-items:flex-start;color:var(--fg);font-size:13px}.chk input{margin-top:3px}.hl{display:flex;gap:8px;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px}.hl a{color:var(--brand)}.rs{background:var(--infobg);border-radius:6px;padding:4px 10px;margin-top:6px;font-size:12.5px}.rs ol{margin:4px 0;padding-inline-start:20px}.hide{display:none}.w120{width:190px}.mt10{margin-top:10px}.mt12{margin-top:12px}.mt16{margin-top:16px}.m0{margin:0}.between{justify-content:space-between}.row>.pill{flex:0 0 auto}.row>h2{flex:1}
 a.btn{display:inline-block;padding:9px 14px;border:1px solid var(--line);border-radius:8px;color:var(--fg);text-decoration:none}
 </style>
 </head>
@@ -100,12 +100,21 @@ a.btn{display:inline-block;padding:9px 14px;border:1px solid var(--line);border-
       <div id="pkg-wrap"><label id="l-pkg"></label><input type="text" id="pkg" dir="ltr" placeholder="com.example.app" autocomplete="off"></div>
       <div id="obj-wrap"><label id="l-obj"></label><textarea id="obj"></textarea>
       <div class="row"><div><label id="l-steps"></label><input type="number" id="steps" min="1" max="200" value="15"></div><div><label id="l-time"></label><input type="number" id="time" min="10" max="1800" value="180"></div></div></div>
+      <div id="adv-wrap" class="hide">
+        <h2 class="mt16" id="t-adv"></h2>
+        <div class="row"><div><label id="l-cost"></label><input type="number" id="maxcost" min="0" step="0.1" placeholder="2.00"></div><div><label id="l-pin"></label><input type="number" id="pin" min="0" step="0.1"></div><div><label id="l-pout"></label><input type="number" id="pout" min="0" step="0.1"></div></div>
+        <p class="note" id="n-price"></p>
+        <label class="chk"><input type="checkbox" id="confirm" checked> <span id="l-confirm"></span></label>
+        <label class="chk"><input type="checkbox" id="vision"> <span id="l-vision"></span></label>
+        <div class="warn hide" id="w-vision"></div>
+      </div>
       <div class="row mt12"><button class="primary" id="btn-start"></button><button class="danger hide" id="btn-cancel"></button></div>
       <div id="run-err" class="err hide"></div>
     </section>
   </div>
 
   <div class="col">
+    <section class="card hide" id="card-history"><h2 id="t-hist"></h2><div id="hist"></div></section>
     <section class="card">
       <div class="row between"><h2 id="t-live" class="m0"></h2><span class="pill" id="status"></span></div>
       <div class="bar"><div id="bar"></div></div>
@@ -136,7 +145,7 @@ save:'حفظ',test:'اختبار الاتصال',clear:'مسح',notConf:'لم ي
 privacy:'تنبيه: نصوص واجهة التطبيق وأسطر السجل تُرسل إلى مزود النموذج. لا تختبر تطبيقاً يعرض بيانات شخصية حقيقية.',
 run:'3. الاختبار',pkg:'اسم الحزمة (Package) — يجب أن يكون التطبيق مثبتاً على الجهاز',obj:'ما الذي تريد البحث عنه؟',steps:'أقصى عدد خطوات',time:'المهلة (ثوانٍ)',
 objDef:'استكشف التطبيق وابحث عن الانهيارات وعطل التنقل والأزرار التي لا تستجيب ومشاكل الواجهة الواضحة.',
-preset:'إعداد جاهز',noPreset:'(مخصص)',testKind:'نوع الاختبار',explore:'استكشاف بالذكاء الاصطناعي',smoke:'اختبار دخان (تثبيت وتشغيل وفحص الانهيار، بلا نموذج)',apk:'مسار ملف APK على هذا الكمبيوتر',needApk:'أدخل مسار ملف APK.',start:'ابدأ الاختبار',cancel:'إيقاف',live:'النتيجة المباشرة',idle:'جاهز',running:'يعمل...',
+adv:'خيارات متقدمة',cost:'سقف التكلفة (دولار)',pin:'سعر الدخل لكل مليون رمز ($)',pout:'سعر الخرج لكل مليون رمز ($)',priceNote:'الأسعار تدخلها أنت من صفحة مزوّدك؛ البرنامج لا يعرفها. السقف يعمل فقط إذا أدخلت السعرين، وقد يتجاوزه طلب واحد.',confirmCrashes:'عند حدوث انهيار: أعد تشغيل الخطوات للتأكد من تكراره',vision:'أرسل لقطات الشاشة إلى النموذج (رؤية)',visionWarn:'اللقطات تُرسل كما هي إلى مزوّد النموذج ولا يمكن إخفاء ما فيها من بيانات حساسة، وتزيد التكلفة. (النصوص تُحجب جزئياً: البريد والأرقام والرموز.)',hist:'التشغيلات السابقة',report:'تقرير HTML',repro:'خطوات إعادة الإنتاج',reproOk:'أُعيد حدوثه عند إعادة التشغيل',reproNo:'لم يتكرر عند إعادة التشغيل (قد يكون متقطعاً)',reproUnk:'تعذّر التأكيد',costLabel:'تكلفة تقديرية',preset:'إعداد جاهز',noPreset:'(مخصص)',testKind:'نوع الاختبار',explore:'استكشاف بالذكاء الاصطناعي',smoke:'اختبار دخان (تثبيت وتشغيل وفحص الانهيار، بلا نموذج)',apk:'مسار ملف APK على هذا الكمبيوتر',needApk:'أدخل مسار ملف APK.',start:'ابدأ الاختبار',cancel:'إيقاف',live:'النتيجة المباشرة',idle:'جاهز',running:'يعمل...',
 empty:'لا يوجد تشغيل بعد. اختر الوضع واضغط «ابدأ الاختبار».',steps2:'الخطوات',find:'النتائج (Findings)',noFind:'لا نتائج.',
 verified:'مُتحقَّق منه',ai:'ملاحظة النموذج (غير مؤكدة)',download:'تنزيل التقرير (JSON)',
 PASSED:'نجح',FAILED:'فشل (عُثر على علّة)',BLOCKED:'متعثر',CANCELLED:'أُلغي',TIMEOUT:'انتهت المهلة',MAX_STEPS_REACHED:'بلغ حد الخطوات',BUDGET_EXCEEDED:'بلغ حد طلبات النموذج',ERROR:'خطأ',
@@ -151,7 +160,7 @@ save:'Save',test:'Test connection',clear:'Clear',notConf:'Model not configured y
 privacy:'Note: the app UI text and log lines are sent to the model provider. Do not test an app that shows real personal data.',
 run:'3. Test',pkg:'Package name — the app must already be installed on the device',obj:'What should it look for?',steps:'Max steps',time:'Timeout (seconds)',
 objDef:'Explore the application and identify crashes, broken navigation, unresponsive controls and obvious UI problems.',
-preset:'Preset',noPreset:'(custom)',testKind:'Test type',explore:'AI exploration',smoke:'Smoke test (install, launch, crash check; no model)',apk:'APK file path on this computer',needApk:'Enter the APK path.',start:'Start test',cancel:'Stop',live:'Live result',idle:'Ready',running:'Running...',
+adv:'Advanced',cost:'Cost cap (USD)',pin:'Input price per million tokens ($)',pout:'Output price per million tokens ($)',priceNote:'You enter the prices from your provider; the program does not know them. The cap only works if both prices are set, and one request can overshoot it.',confirmCrashes:'On a crash: replay the steps to check it happens again',vision:'Send screenshots to the model (vision)',visionWarn:'Screenshots are sent as they are to the model provider; sensitive data in them cannot be hidden, and cost goes up. (Text is partly masked: emails, numbers, tokens.)',hist:'Previous runs',report:'HTML report',repro:'Steps to reproduce',reproOk:'happened again when replayed',reproNo:'did not recur when replayed (may be intermittent)',reproUnk:'could not be confirmed',costLabel:'estimated cost',preset:'Preset',noPreset:'(custom)',testKind:'Test type',explore:'AI exploration',smoke:'Smoke test (install, launch, crash check; no model)',apk:'APK file path on this computer',needApk:'Enter the APK path.',start:'Start test',cancel:'Stop',live:'Live result',idle:'Ready',running:'Running...',
 empty:'No run yet. Pick a mode and press "Start test".',steps2:'Steps',find:'Findings',noFind:'No findings.',
 verified:'verified',ai:'model observation (unverified)',download:'Download report (JSON)',
 PASSED:'Passed',FAILED:'Failed (bug found)',BLOCKED:'Blocked',CANCELLED:'Cancelled',TIMEOUT:'Timed out',MAX_STEPS_REACHED:'Step limit reached',BUDGET_EXCEEDED:'LLM call limit reached',ERROR:'Error',
@@ -174,12 +183,12 @@ function showErr(id,msg){var e=$(id);if(msg){e.textContent=msg;e.classList.remov
 
 function applyText(){
   document.documentElement.lang=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';
-  var map={tagline:'tagline','t-mode':'mode','mode-demo':'demo','mode-real':'real','t-device':'device','btn-refresh':'refresh','device-help':'devHelp','t-model':'model','l-kind':'kind','l-model':'modelName','l-url':'url','l-preset':'preset','l-test':'testKind','l-apk':'apk','l-key':'key','btn-save':'save','btn-test':'test','btn-clear':'clear','privacy':'privacy','t-run':'run','l-pkg':'pkg','l-obj':'obj','l-steps':'steps','l-time':'time','btn-start':'start','btn-cancel':'cancel','t-live':'live','empty':'empty','t-steps':'steps2','t-find':'find'};
+  var map={tagline:'tagline','t-mode':'mode','mode-demo':'demo','mode-real':'real','t-device':'device','btn-refresh':'refresh','device-help':'devHelp','t-model':'model','l-kind':'kind','l-model':'modelName','l-url':'url','l-preset':'preset','t-adv':'adv','l-cost':'cost','l-pin':'pin','l-pout':'pout','n-price':'priceNote','l-confirm':'confirmCrashes','l-vision':'vision','w-vision':'visionWarn','t-hist':'hist','l-test':'testKind','l-apk':'apk','l-key':'key','btn-save':'save','btn-test':'test','btn-clear':'clear','privacy':'privacy','t-run':'run','l-pkg':'pkg','l-obj':'obj','l-steps':'steps','l-time':'time','btn-start':'start','btn-cancel':'cancel','t-live':'live','empty':'empty','t-steps':'steps2','t-find':'find'};
   for(var id in map){$(id).textContent=t(map[id])}
   $('kind').options[1].textContent=t('ocompat');
   $('testkind').options[0].textContent=t('explore');$('testkind').options[1].textContent=t('smoke');
   fillPresets();
-  var smoke=testKind()==='smoke';$('test-wrap').classList.toggle('hide',mode==='demo');$('apk-wrap').classList.toggle('hide',!(mode==='real'&&smoke));$('obj-wrap').classList.toggle('hide',smoke);$('card-model').classList.toggle('off',mode==='demo'||smoke);
+  var smoke=testKind()==='smoke';$('test-wrap').classList.toggle('hide',mode==='demo');$('adv-wrap').classList.toggle('hide',!(mode==='real'&&!smoke));$('apk-wrap').classList.toggle('hide',!(mode==='real'&&smoke));$('obj-wrap').classList.toggle('hide',smoke);$('card-model').classList.toggle('off',mode==='demo'||smoke);
   $('mode-note').textContent=t(mode==='demo'?'modeDemo':'modeReal');
   $('apiKey').placeholder=(last&&last.provider&&last.provider.keyPresent)?t('keySaved'):'sk-...';
   if(!$('obj').dataset.touched){$('obj').value=t('objDef')}
@@ -189,12 +198,22 @@ function applyText(){
   if(last)render(last);
 }
 
+function num(v){return v===''||isNaN(Number(v))?undefined:Number(v)}
 function testKind(){return mode==='real'&&$('testkind').value==='smoke'?'smoke':'explore'}
 function fillPresets(){
   var sel=$('preset'),presets=(last&&last.presets)||[];
   if(sel.options.length===presets.length+1){sel.options[0].textContent=t('noPreset');return}
   sel.textContent='';var o=document.createElement('option');o.value='';o.textContent=t('noPreset');sel.appendChild(o);
   presets.forEach(function(p){var x=document.createElement('option');x.value=p.id;x.textContent=p.label;sel.appendChild(x)});
+}
+function renderHistory(s){
+  var list=s.history||[];$('card-history').classList.toggle('hide',!list.length);
+  var box=$('hist');box.textContent='';
+  list.forEach(function(r){
+    var row=el('div','hl');var left=el('div');left.appendChild(el('div',null,r.packageName+' · '+r.test+' · '+r.status));
+    left.appendChild(el('small','note',r.startedAt.slice(0,16).replace('T',' ')+(r.costUsd!==undefined?' · ~$'+r.costUsd.toFixed(4):'')));
+    row.appendChild(left);var a=el('a',null,t('report'));a.href='/api/runs/'+r.id+'/report.html?lang='+lang+'&t='+encodeURIComponent(token||'');a.target='_blank';a.rel='noopener';row.appendChild(a);box.appendChild(row);
+  });
 }
 function renderDevices(s){
   var box=$('devices');box.textContent='';
@@ -227,7 +246,7 @@ function pillFor(run){
   pill.classList.add(st==='PASSED'||st==='MAX_STEPS_REACHED'?'ok':(st==='FAILED'||st==='ERROR'?'bad':'warn'));
 }
 function render(s){
-  last=s;fillPresets();renderDevices(s);renderModel(s);
+  last=s;fillPresets();renderDevices(s);renderModel(s);renderHistory(s);
   var run=s.run;
   pillFor(run);
   $('btn-cancel').classList.toggle('hide',!(run&&run.status==='running'));
@@ -258,15 +277,16 @@ function render(s){
     var d=el('div','f');var badge=el('span','pill '+(f.source==='VERIFIED'?'bad':''),f.severity);d.appendChild(badge);
     d.appendChild(el('span',null,' '+f.title+' '));d.appendChild(el('small','note','— '+(f.source==='VERIFIED'?t('verified'):t('ai'))));
     if(f.description){d.appendChild(el('div','note',f.description))}
+    if(f.reproSteps&&f.reproSteps.length){var rs=el('div','rs');rs.appendChild(el('b',null,t('repro')));var ol=el('ol');f.reproSteps.forEach(function(x){ol.appendChild(el('li',null,x.replace(/^[0-9]+[.] */,'')))});rs.appendChild(ol);if(f.reproduced){rs.appendChild(el('div',null,f.reproduced==='CONFIRMED'?t('reproOk'):(f.reproduced==='NOT_REPRODUCED'?t('reproNo'):t('reproUnk'))))}d.appendChild(rs)}
     fb.appendChild(d);
   });
   $('summary').textContent=run.smoke?run.smoke.summary:(run.result?run.result.summary:(run.error||''));
   var tel=$('telemetry');tel.textContent='';
   if(run.result){var m=run.result.telemetry;
-    [m.actions+' '+t('actions')+' ('+m.actionFailures+' '+t('failed')+')',m.llmCalls+' '+t('calls'),m.inputTokens+'/'+m.outputTokens+' '+t('tokens'),(m.durationMs/1000).toFixed(1)+' '+t('secs')].forEach(function(x){tel.appendChild(el('span',null,x))});
+    [m.actions+' '+t('actions')+' ('+m.actionFailures+' '+t('failed')+')',m.llmCalls+' '+t('calls'),m.inputTokens+'/'+m.outputTokens+' '+t('tokens'),(m.durationMs/1000).toFixed(1)+' '+t('secs')].concat(m.costUsd!==undefined?['~$'+m.costUsd.toFixed(4)+' '+t('costLabel')]:[]).forEach(function(x){tel.appendChild(el('span',null,x))});
   }
   var dl=$('dl');dl.textContent='';
-  if(run.result||run.smoke){var a=el('a','btn',t('download'));a.href='/api/run/report?t='+encodeURIComponent(token||'');dl.appendChild(a)}
+  if(run.result||run.smoke){var a=el('a','btn',t('download'));a.href='/api/run/report?t='+encodeURIComponent(token||'');dl.appendChild(a);var h=el('a','btn',t('report'));h.href='/api/run/report.html?lang='+lang+'&t='+encodeURIComponent(token||'');h.target='_blank';h.rel='noopener';h.style.marginInlineStart='8px';dl.appendChild(h)}
 }
 function refresh(){
   if(!token){showErr('run-err',t('noToken'));return Promise.resolve()}
@@ -279,6 +299,7 @@ $('lang-en').addEventListener('click',function(){lang='en';try{localStorage.setI
 $('mode-demo').addEventListener('click',function(){mode='demo';applyText()});
 $('mode-real').addEventListener('click',function(){mode='real';applyText();$('btn-refresh').click()});
 $('testkind').addEventListener('change',applyText);
+$('vision').addEventListener('change',function(){$('w-vision').classList.toggle('hide',!$('vision').checked)});
 $('preset').addEventListener('change',function(){var id=$('preset').value,ps=(last&&last.presets)||[];for(var i=0;i<ps.length;i++){if(ps[i].id===id){$('baseUrl').value=ps[i].baseUrl;$('model').value=ps[i].exampleModel;$('apiKey').placeholder=ps[i].requiresKey?'API key':'(optional)'}}});
 $('obj').addEventListener('input',function(){$('obj').dataset.touched='1'});
 $('kind').addEventListener('change',function(){var o=$('kind').value==='openai-compatible';$('url-wrap').classList.toggle('hide',!o);$('model').value=o?'':'claude-sonnet-5-5';$('apiKey').placeholder=o?'(optional)':'sk-ant-...'});
@@ -298,7 +319,7 @@ $('btn-start').addEventListener('click',function(){
     if(!$('pkg').value.trim()){return showErr('run-err',t('needPkg'))}
   }
   busy=true;bigId=null;
-  api('POST','/api/run',{mode:mode,test:testKind(),apkPath:$('apk').value,package:$('pkg').value,objective:$('obj').value,maxSteps:Number($('steps').value),timeoutMs:Number($('time').value)*1000,deviceId:selected||undefined})
+  api('POST','/api/run',{mode:mode,test:testKind(),apkPath:$('apk').value,maxCostUsd:num($('maxcost').value),inputPrice:num($('pin').value),outputPrice:num($('pout').value),vision:$('vision').checked,confirmCrashes:$('confirm').checked,package:$('pkg').value,objective:$('obj').value,maxSteps:Number($('steps').value),timeoutMs:Number($('time').value)*1000,deviceId:selected||undefined})
    .then(function(){busy=false;return refresh()}).catch(function(e){busy=false;showErr('run-err',e.message)});
 });
 $('btn-cancel').addEventListener('click',function(){api('POST','/api/run/cancel').then(refresh).catch(function(e){showErr('run-err',e.message)})});

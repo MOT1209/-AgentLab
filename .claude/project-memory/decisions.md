@@ -61,3 +61,4 @@ Format: date — decision — reason
 - Evidence file names are generated (EV-nnn.ext) and the task id is sanitised; files are 0600. The evidence directory is chosen by the caller, never by the model.
 - Blocked tasks carry machine-readable error codes (AgentResult.error): DEVICE_UNAVAILABLE, DEVICE_BUSY, NO_DEVICE_ASSIGNED, NO_CAPABLE_AGENT.
 - A-1: one web UI (src/ui) because it already had token/Host/CSP/size-limit defences; the unauthenticated Control Center API (src/api + web/) was removed after its audit findings. Its useful parts (provider presets, smoke test) were ported.
+- P2: money caps use caller-supplied prices only (no built-in table: it would go stale and look authoritative). History uses node:sqlite to keep zero dependencies; DB lives in ~/.agentlab, 0600. Crash confirmation is opt-in at the library level (task.confirmCrashes), on by default in the UI; NOT_REPRODUCED never downgrades a verified crash.

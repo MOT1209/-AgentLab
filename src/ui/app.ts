@@ -8,6 +8,9 @@ import { MockProvider } from "../providers/mock-provider.js";
 import { ProviderManager } from "../providers/manager.js";
 import type { ProviderConfig } from "../providers/types.js";
 import { PROVIDER_PRESETS } from "../providers/presets.js";
+import { randomBytes } from "node:crypto";
+import type { RunStore, StoredRun } from "../store/run-store.js";
+import { renderReportHtml, type ReportLang } from "./report-html.js";
 import type { Device } from "../device/types.js";
 import { AdbDevice } from "../device/adb-device.js";
 import { AdbDiscovery, DeviceDiscovery, DiscoveredDevice } from "../runtime/discovery.js";
@@ -38,6 +41,15 @@ export interface RunInput {
   test?: "explore" | "smoke";
   /** Smoke only: path of the APK to install. */
   apkPath?: string;
+  /** Explore only. Stop once the estimated cost reaches this many USD. Needs both prices. */
+  maxCostUsd?: number;
+  /** USD per million tokens, as stated by the user (there is no built-in price table). */
+  inputPrice?: number;
+  outputPrice?: number;
+  /** Send each screenshot to the model. */
+  vision?: boolean;
+  /** Replay the steps behind each crash to see whether it happens again. */
+  confirmCrashes?: boolean;
   package?: string;
   objective?: string;
   maxSteps?: number;
@@ -83,7 +95,7 @@ export class UiApp {
   private providerTest: { ok: boolean; message: string } | undefined;
   private run: RunState | undefined;
 
-  constructor(private readonly opts: { discovery?: DeviceDiscovery; createDevice?: (d: DiscoveredDevice) => Device; /** adb executable; default "adb" on PATH. */ adbPath?: string } = {}) {}
+  constructor(private readonly opts: { discovery?: DeviceDiscovery; createDevice?: (d: DiscoveredDevice) => Device; /** adb executable; default "adb" on PATH. */ adbPath?: string; /** Where finished real runs are kept. Without it nothing is saved. */ store?: RunStore } = {}) {}
 
   // ---- devices -----------------------------------------------------------------------------
 
@@ -173,11 +185,19 @@ export class UiApp {
     const pkg = demo ? "com.example.demo" : (input.package ?? "").trim();
     const objective = (input.objective ?? "").trim() || "Explore the application and identify crashes, broken navigation, unresponsive controls and obvious UI problems.";
     if (!demo && !pkg) throw new UiError(400, "Package name is required (e.g. com.example.app).");
+    const extra: Record<string, unknown> = {};
+    if (!demo && test === "explore") {
+      if (input.maxCostUsd !== undefined) extra.maxCostUsd = input.maxCostUsd;
+      if (input.inputPrice !== undefined || input.outputPrice !== undefined) extra.pricing = { inputPerMTok: input.inputPrice, outputPerMTok: input.outputPrice };
+      if (input.vision === true) extra.vision = true;
+      if (input.confirmCrashes === true) extra.confirmCrashes = true;
+    }
     const parsed = parseExplorationTask({
       objective,
       app: { packageName: pkg },
       ...(input.maxSteps !== undefined ? { maxSteps: input.maxSteps } : { maxSteps: demo ? 6 : 15 }),
       ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : { timeoutMs: 180_000 }),
+      ...extra,
     });
     if (!parsed.ok) throw new UiError(400, parsed.errors.join("; "));
 
@@ -200,7 +220,7 @@ export class UiApp {
     }
 
     const run: RunState = {
-      id: Math.random().toString(36).slice(2, 10),
+      id: randomBytes(5).toString("hex"),
       mode: input.mode,
       test,
       status: "running",
@@ -240,7 +260,7 @@ export class UiApp {
           run.status = "finished";
           return;
         }
-        const task = await rt.orchestrator.dispatch("MAIN-05", "explore", { objective, app: { packageName: pkg }, maxSteps: parsed.task.maxSteps, timeoutMs: parsed.task.timeoutMs }, { signal: run.abort.signal });
+        const task = await rt.orchestrator.dispatch("MAIN-05", "explore", { objective, app: { packageName: pkg }, maxSteps: parsed.task.maxSteps, timeoutMs: parsed.task.timeoutMs, ...extra }, { signal: run.abort.signal });
         const child = (task.result as AgentResult | undefined)?.children?.[0];
         const result = child?.details as ExplorationResult | undefined;
         run.taskStatus = task.status;
@@ -252,9 +272,43 @@ export class UiApp {
         run.error = e instanceof Error ? e.message : String(e);
       } finally {
         run.finishedAt = new Date().toISOString();
+        this.persist(run);
       }
     })();
     return { id: run.id };
+  }
+
+  /** Real runs only; a storage failure must never break the UI. */
+  private persist(run: RunState): void {
+    if (!this.opts.store || run.mode !== "real") return;
+    try {
+      this.opts.store.save(toStored(run), run.screenshots);
+    } catch (e) {
+      pushEvent(run, { kind: "storage-error", message: e instanceof Error ? e.message.slice(0, 200) : "save failed" });
+    }
+  }
+
+  /** Newest first. Empty without a store. */
+  history(limit = 15) {
+    try {
+      return this.opts.store?.list(limit) ?? [];
+    } catch {
+      return [];
+    }
+  }
+
+  /** HTML report of the current run (`id` omitted or equal to it) or a saved one. */
+  reportHtml(id: string | undefined, lang: ReportLang, nonce: string): string | undefined {
+    const r = this.run;
+    if (r && r.status !== "running" && (id === undefined || id === r.id)) return renderReportHtml(toStored(r), r.screenshots, lang, nonce);
+    if (id === undefined || !this.opts.store) return undefined;
+    const saved = this.opts.store.get(id);
+    return saved ? renderReportHtml(saved, this.opts.store.screenshots(id), lang, nonce) : undefined;
+  }
+
+  /** A screenshot of a saved run. */
+  savedScreenshot(runId: string, evId: string): Buffer | undefined {
+    return this.opts.store?.screenshot(runId, evId);
   }
 
   cancelRun(): void {
@@ -272,6 +326,7 @@ export class UiApp {
     return {
       devices: { list: this.devices.snapshot().map(slimDevice), error: this.deviceError ?? null },
       presets: PROVIDER_PRESETS.filter((p) => p.kind === "openai-compatible").map((p) => ({ id: p.id, label: p.label, baseUrl: p.baseUrl, exampleModel: p.exampleModel, requiresKey: p.requiresKey })),
+      history: this.history(),
       provider: this.providerInfo ? { configured: true, ...this.providerInfo, test: this.providerTest ?? null } : { configured: false },
       run: r
         ? {
@@ -298,6 +353,26 @@ export class UiApp {
     if (!r?.result) return undefined;
     return { run: { id: r.id, mode: r.mode, test: r.test, params: r.params, taskStatus: r.taskStatus }, result: slimResult(r.result) };
   }
+}
+
+function toStored(r: RunState): StoredRun {
+  const tel = r.result?.telemetry;
+  return {
+    id: r.id,
+    startedAt: r.startedAt,
+    ...(r.finishedAt ? { finishedAt: r.finishedAt } : {}),
+    mode: r.mode,
+    test: r.test,
+    packageName: r.params.package,
+    status: r.smoke?.status ?? r.result?.status ?? "ERROR",
+    summary: r.smoke?.summary ?? r.result?.summary ?? r.error ?? "",
+    ...(tel?.costUsd !== undefined ? { costUsd: tel.costUsd } : {}),
+    inputTokens: tel?.inputTokens ?? 0,
+    outputTokens: tel?.outputTokens ?? 0,
+    params: r.params,
+    ...(r.result ? { result: slimResult(r.result) } : {}),
+    ...(r.smoke ? { smoke: r.smoke } : {}),
+  };
 }
 
 function pushEvent(run: RunState, e: { kind: string; [k: string]: unknown }): void {
