@@ -98,24 +98,21 @@ The UI is Arabic or English (switch at the top). Safety properties: it listens o
 
 `npm run explore -- --mock` (offline demo) or `npm run explore -- --package com.example.app` (real device + `ANTHROPIC_API_KEY`). It writes `out/<task-id>/report.json` and the screenshots as PNG files. Otherwise AgentLab is a library (`src/index.ts`).
 
-### Control Center (web UI)
+### Web UI details
 
-`npm run dev:api`, then open the link it prints (`http://127.0.0.1:4000/?token=...`; Arabic/English toggle). The API listens on loopback only and every call needs that random token (set your own with `AGENTLAB_API_TOKEN`). Options are environment
-variables set in the same terminal before starting: `PORT`, `PROVIDERS_FILE`, `ADB_PATH`.
-API keys are never typed into the UI: export the key (for example `GROQ_API_KEY`) first, then add the
-provider and enter only the variable's name.
+There is one web UI (`npm run ui`, Arabic/English). Besides the exploration test it offers **presets** for OpenAI-compatible providers (Groq, OpenRouter, Ollama, ...) and a **smoke test** (install an APK, launch, crash check; no model or key needed) in real-device mode. Keys are typed into the page and kept in memory only.
 
-**Android devices need `adb`.** If the UI says "adb was not found", either add Android platform-tools to PATH
-(Android Studio keeps it in `%LOCALAPPDATA%\Android\Sdk\platform-tools` on Windows) or point to it:
+**Android devices need `adb`.** If the UI says "adb not found", either add Android platform-tools to PATH
+(Android Studio keeps it in `%LOCALAPPDATA%\Android\Sdk\platform-tools` on Windows) or point to it with `ADB_PATH`:
 
 ```
 :: Windows CMD                                   # PowerShell
 set ADB_PATH=C:\path\to\platform-tools\adb.exe    $env:ADB_PATH="C:\path\to\platform-tools\adb.exe"
-npm run dev:api
+npm run ui
 ```
 
 Check `adb devices` in that terminal first. A phone listed as `unauthorized` is waiting for you to accept the
-"Allow USB debugging" prompt on its screen. Provider keys must come from env vars named `*API_KEY`, `*_KEY` or `*_TOKEN`, and a keyed provider must use https (or localhost).
+"Allow USB debugging" prompt on its screen.
 
 ### 1. Try it with no device and no API key
 

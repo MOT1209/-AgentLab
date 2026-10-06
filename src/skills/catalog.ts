@@ -241,7 +241,7 @@ Testing an app's own security; that is a separate, not yet built, capability.
 ## Safety
 - Never let a model execute arbitrary shell, ADB, code, MCP calls or credential/Google/Play Store actions. CODE_WRITE and ADMIN are never granted by default.
 - Dangerous tools (shell.*, adb.raw, fs.*, code.exec, credentials.*, google.*, playstore.*) are rejected by validation.
-- The Control Center API has no authentication; keep it on localhost.
+- The web UI binds to 127.0.0.1 and requires a random launch token; never expose it beyond localhost.
 
 ## AgentLab-specific rules
 No Google account, OAuth or Play Store automation. Permission denials are BLOCKED, not ERROR.`,

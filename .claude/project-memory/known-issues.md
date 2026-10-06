@@ -19,7 +19,6 @@
 - No cost cap in money terms (see maxCost above); steps, time, LLM calls and tokens are capped per run by the agent profile — MEDIUM — open
 - No back-off between LLM calls and no concurrency limit across the 12 MAIN agents (rate limits untested) — LOW — open
 - uiautomator dump can fail while an animation runs or on secure screens (FLAG_SECURE); the agent then sees "ui: unavailable" — LOW — open
-- Two overlapping web UIs (src/ui on its own port and src/api + web/); different APIs and state models. Pick one or share a backend — MEDIUM — open
 - Phase 4.5 real-device proof is still NOT done (no device/emulator here); the opt-in test (REAL_DEVICE_TEST=1) and the real-adb test (needs an adb binary) are skipped in CI-like runs — HIGH — open
 - Skill enforcement covers only AgentLab's own handlers/actions; generated .claude/.agent SKILL.md files are advisory and cannot be enforced — MEDIUM — by design
 - .agent/skills convention unverified (Antigravity docs and skills.sh were blocked); may need `.agents/` — LOW — open
@@ -30,8 +29,7 @@
 - Goal loop has no independent verification or replanning; the exploration loop only maps onto it — MEDIUM — open
 - No Agent Run record (skills, tools, LLM calls, tokens, cost, evidence in one place); only ExplorationTelemetry and the message bus — LOW — open
 - Profile limits (steps, LLM calls, tokens, time) are enforced only inside the exploration loop; the smoke handler is a fixed sequence and Agent.run still has no per-task timeout — LOW — open
-- src/api/ now requires a random token, checks Host, accepts only JSON, caps bodies at 64KB, binds 127.0.0.1 (audit S-1/S-2/S-3 fixed). Still single-user, no per-user authz — LOW — open
-- Control Center UI has only been exercised in headless Chromium against mocks; no real device/adb/LLM, no mobile-browser pass, — MEDIUM — open. POST /providers env names are now restricted to *API_KEY/*_KEY/*_TOKEN and keyed providers must use https or localhost
+- The web UI (src/ui) has only been exercised in headless Chromium against mocks; no real device/adb/LLM, no mobile-browser pass — MEDIUM — open
 - GET /events has no reconnection/backlog support: a client that connects after a run started misses earlier messages (bus.history() exists but isn't replayed on connect) — LOW — open
 - UI real-device mode (device list, key entry, run) has never been exercised against real adb or a live LLM — HIGH — open
 - UI is single-user, single-run, in-memory: refresh keeps the run (server side) but a server restart loses it; no auth beyond the launch token — LOW — open
@@ -42,4 +40,4 @@
 - Simulated adb accepts the same commands the code currently sends; if the code changes its commands, update test/support/fake-adb.ts — LOW — open
 - No linter is configured in this project (only tsc strict) — LOW — open
 - P1 fixes (unproven on real hardware): adb install timeout is 10 min (others 30s); only connection-loss errors set a device to ERROR; TYPE single-quotes ASCII (symbols kept) and non-ASCII needs the ADBKeyboard app (fails loudly otherwise, ADBKeyboard path never run on a device); smoke validates its payload, clears logs, uses package-scoped detectCrash and always stops the app — LOW — open until a real run
-- P1 still open: merge the two web UIs (src/ui vs src/api+web); benchmark app with planted bugs vs adb monkey (needs a real device) — MEDIUM — open
+- P1 still open: benchmark app with planted bugs vs adb monkey (needs a real device) — MEDIUM — open

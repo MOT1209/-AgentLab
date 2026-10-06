@@ -176,3 +176,30 @@ test("device refresh: adb missing is a readable message, found devices are liste
   assert.match((app.state().devices as { error: string }).error, /R58: device is unauthorized/); // the user is told why
   assert.ok(MockDevice && UiError);
 });
+
+test("state offers the provider presets; smoke needs a real device and a valid APK path", async () => {
+  const s = await start();
+  const st = (await s.call("GET", "/api/state")).json;
+  assert.ok(st.presets.some((p: { id: string; baseUrl: string }) => p.id === "groq" && p.baseUrl.startsWith("https://")));
+  assert.ok(!JSON.stringify(st.presets).includes("anthropic"));
+  assert.match((await s.call("POST", "/api/run", { mode: "demo", test: "smoke", apkPath: "a.apk" })).json.error, /real device/);
+  assert.match((await s.call("POST", "/api/run", { mode: "real", test: "smoke", package: "com.x.y", apkPath: "-g", deviceId: "d" })).json.error, /APK path/);
+  assert.match((await s.call("POST", "/api/run", { mode: "real", test: "smoke", package: "com.x.y", apkPath: "notanapk.txt", deviceId: "d" })).json.error, /APK path/);
+  await s.close();
+});
+
+test("real smoke run through the UI: no model needed, screenshot kept, result and report available", async () => {
+  const found: DeviceDiscovery = { discover: async () => [{ serial: "emulator-5554", state: "device", model: "sdk" }] };
+  const app = new UiApp({ discovery: found, createDevice: (d) => new MockDevice(d.serial) });
+  await app.refreshDevices();
+  const s = await start(app);
+  const started = await s.call("POST", "/api/run", { mode: "real", test: "smoke", package: "com.example.app", apkPath: "/tmp/app.apk", deviceId: "emulator-5554" });
+  assert.equal(started.status, 202, JSON.stringify(started.json));
+  await waitFor(async () => (await s.call("GET", "/api/state")).json.run.status !== "running");
+  const run = (await s.call("GET", "/api/state")).json.run;
+  assert.equal(run.test, "smoke");
+  assert.equal(run.smoke.status, "PASSED");
+  assert.equal((await s.call("GET", "/api/run/screenshot/EV-001")).status, 200);
+  assert.equal((await s.call("GET", "/api/run/report")).json.smoke.status, "PASSED");
+  await s.close();
+});

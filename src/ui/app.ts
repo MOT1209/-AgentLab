@@ -7,7 +7,9 @@ import { demoScreenshot } from "./demo-png.js";
 import { MockProvider } from "../providers/mock-provider.js";
 import { ProviderManager } from "../providers/manager.js";
 import type { ProviderConfig } from "../providers/types.js";
+import { PROVIDER_PRESETS } from "../providers/presets.js";
 import type { Device } from "../device/types.js";
+import { AdbDevice } from "../device/adb-device.js";
 import { AdbDiscovery, DeviceDiscovery, DiscoveredDevice } from "../runtime/discovery.js";
 import { DeviceManager } from "../runtime/device-manager.js";
 import type { DeviceSnapshot } from "../runtime/types.js";
@@ -32,6 +34,10 @@ export interface ProviderInput {
 
 export interface RunInput {
   mode: "demo" | "real";
+  /** "explore" (LLM-driven, default) or "smoke" (install, launch, crash check; no LLM). Smoke is real-device only. */
+  test?: "explore" | "smoke";
+  /** Smoke only: path of the APK to install. */
+  apkPath?: string;
   package?: string;
   objective?: string;
   maxSteps?: number;
@@ -49,6 +55,7 @@ interface RunEvent {
 interface RunState {
   id: string;
   mode: "demo" | "real";
+  test: "explore" | "smoke";
   status: "running" | "finished" | "error";
   startedAt: string;
   finishedAt?: string;
@@ -56,6 +63,8 @@ interface RunState {
   events: RunEvent[];
   screenshots: Map<string, Buffer>;
   result?: ExplorationResult;
+  /** Smoke runs have no ExplorationResult; this is their outcome. */
+  smoke?: { status: string; summary: string };
   taskStatus?: string;
   error?: string;
   abort: AbortController;
@@ -74,7 +83,7 @@ export class UiApp {
   private providerTest: { ok: boolean; message: string } | undefined;
   private run: RunState | undefined;
 
-  constructor(private readonly opts: { discovery?: DeviceDiscovery; createDevice?: (d: DiscoveredDevice) => Device } = {}) {}
+  constructor(private readonly opts: { discovery?: DeviceDiscovery; createDevice?: (d: DiscoveredDevice) => Device; /** adb executable; default "adb" on PATH. */ adbPath?: string } = {}) {}
 
   // ---- devices -----------------------------------------------------------------------------
 
@@ -90,7 +99,8 @@ export class UiApp {
           }
         }
       }
-      const res = await this.devices.discover(this.opts.discovery ?? new AdbDiscovery(), this.opts.createDevice);
+      const adb = this.opts.adbPath ?? "adb";
+      const res = await this.devices.discover(this.opts.discovery ?? new AdbDiscovery(adb), this.opts.createDevice ?? ((d) => new AdbDevice(d.serial, adb)));
       // Tell the user why a device that adb can see is not usable.
       if (res.rejected.length > 0) this.deviceError = res.rejected.map((r) => `${r.serial}: ${r.reason}`).join(" | ");
     } catch (e) {
@@ -156,6 +166,10 @@ export class UiApp {
   startRun(input: RunInput): { id: string } {
     if (this.run?.status === "running") throw new UiError(409, "A run is already in progress.");
     const demo = input.mode === "demo";
+    const test = input.test === "smoke" ? "smoke" : "explore";
+    if (test === "smoke" && demo) throw new UiError(400, "The smoke test needs a real device.");
+    const apkPath = (input.apkPath ?? "").trim();
+    if (test === "smoke" && (!apkPath || apkPath.startsWith("-") || !/\.apk$/i.test(apkPath))) throw new UiError(400, "APK path is required and must end in .apk.");
     const pkg = demo ? "com.example.demo" : (input.package ?? "").trim();
     const objective = (input.objective ?? "").trim() || "Explore the application and identify crashes, broken navigation, unresponsive controls and obvious UI problems.";
     if (!demo && !pkg) throw new UiError(400, "Package name is required (e.g. com.example.app).");
@@ -176,17 +190,19 @@ export class UiApp {
       deviceId = "DEVICE-05 (demo)";
     } else {
       if (!input.deviceId || !this.devices.getDevice(input.deviceId)) throw new UiError(400, "Select a connected device first.");
-      if (!this.providers) throw new UiError(400, "Configure the AI model first.");
+      if (test === "explore" && !this.providers) throw new UiError(400, "Configure the AI model first.");
       const snap = this.devices.describe(input.deviceId)!;
       if (snap.state !== "ONLINE") throw new UiError(400, `Device ${input.deviceId} is ${snap.state}.`);
-      if (this.devices.getAssignment("MAIN-05")) this.devices.unassign("MAIN-05");
-      rt = initializeAgentLab({ devices: [], deviceManager: this.devices, providers: this.providers, assignments: { "MAIN-05": input.deviceId } });
+      const mainId = test === "smoke" ? "MAIN-01" : "MAIN-05";
+      if (this.devices.getAssignment(mainId)) this.devices.unassign(mainId);
+      rt = initializeAgentLab({ devices: [], deviceManager: this.devices, providers: this.providers ?? new ProviderManager(), assignments: { [mainId]: input.deviceId } });
       deviceId = input.deviceId;
     }
 
     const run: RunState = {
       id: Math.random().toString(36).slice(2, 10),
       mode: input.mode,
+      test,
       status: "running",
       startedAt: new Date().toISOString(),
       params: { package: pkg, objective, maxSteps: parsed.task.maxSteps, timeoutMs: parsed.task.timeoutMs, deviceId },
@@ -211,6 +227,19 @@ export class UiApp {
 
     void (async () => {
       try {
+        if (test === "smoke") {
+          const task = await rt.orchestrator.dispatch("MAIN-01", "smoke", { apkPath, packageName: pkg }, { signal: run.abort.signal });
+          const res = task.result as AgentResult | undefined;
+          run.taskStatus = task.status;
+          const shot = res?.evidence.find((e) => e.kind === "screenshot");
+          if (shot) {
+            run.screenshots.set("EV-001", Buffer.from(shot.data, "base64"));
+            pushEvent(run, { kind: "screenshot", id: "EV-001", step: 0 });
+          }
+          run.smoke = { status: task.status, summary: res?.children?.[0]?.summary ?? res?.summary ?? (task.errors.join("; ") || "No result.") };
+          run.status = "finished";
+          return;
+        }
         const task = await rt.orchestrator.dispatch("MAIN-05", "explore", { objective, app: { packageName: pkg }, maxSteps: parsed.task.maxSteps, timeoutMs: parsed.task.timeoutMs }, { signal: run.abort.signal });
         const child = (task.result as AgentResult | undefined)?.children?.[0];
         const result = child?.details as ExplorationResult | undefined;
@@ -242,11 +271,13 @@ export class UiApp {
     const r = this.run;
     return {
       devices: { list: this.devices.snapshot().map(slimDevice), error: this.deviceError ?? null },
+      presets: PROVIDER_PRESETS.filter((p) => p.kind === "openai-compatible").map((p) => ({ id: p.id, label: p.label, baseUrl: p.baseUrl, exampleModel: p.exampleModel, requiresKey: p.requiresKey })),
       provider: this.providerInfo ? { configured: true, ...this.providerInfo, test: this.providerTest ?? null } : { configured: false },
       run: r
         ? {
             id: r.id,
             mode: r.mode,
+            test: r.test,
             status: r.status,
             startedAt: r.startedAt,
             finishedAt: r.finishedAt ?? null,
@@ -255,6 +286,7 @@ export class UiApp {
             taskStatus: r.taskStatus ?? null,
             error: r.error ?? null,
             result: r.result ? slimResult(r.result) : null,
+            smoke: r.smoke ?? null,
           }
         : null,
     };
@@ -262,8 +294,9 @@ export class UiApp {
 
   report(): Record<string, unknown> | undefined {
     const r = this.run;
+    if (r?.smoke) return { run: { id: r.id, mode: r.mode, test: r.test, params: r.params, taskStatus: r.taskStatus }, smoke: r.smoke };
     if (!r?.result) return undefined;
-    return { run: { id: r.id, mode: r.mode, params: r.params, taskStatus: r.taskStatus }, result: slimResult(r.result) };
+    return { run: { id: r.id, mode: r.mode, test: r.test, params: r.params, taskStatus: r.taskStatus }, result: slimResult(r.result) };
   }
 }
 

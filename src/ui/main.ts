@@ -8,7 +8,7 @@ const portArg = argv.indexOf("--port");
 const port = Number(portArg >= 0 ? argv[portArg + 1] : (process.env.AGENTLAB_UI_PORT ?? 4173));
 const token = randomBytes(16).toString("hex");
 
-const app = new UiApp();
+const app = new UiApp(process.env.ADB_PATH ? { adbPath: process.env.ADB_PATH } : {});
 const server = createUiServer(app, { token });
 server.on("error", (e: NodeJS.ErrnoException) => {
   console.error(e.code === "EADDRINUSE" ? `Port ${port} is already in use. Try:  npm run ui -- --port 4174` : `Server error: ${e.message}`);

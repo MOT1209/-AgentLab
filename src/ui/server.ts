@@ -107,6 +107,8 @@ export function createUiServer(app: UiApp, opts: UiServerOptions): Server {
         const num = (v: unknown) => (typeof v === "number" ? v : undefined);
         const started = app.startRun({
           mode: b.mode === "real" ? "real" : "demo",
+          ...(b.test === "smoke" ? { test: "smoke" as const } : {}),
+          ...(typeof b.apkPath === "string" ? { apkPath: b.apkPath } : {}),
           ...(typeof b.package === "string" ? { package: b.package } : {}),
           ...(typeof b.objective === "string" ? { objective: b.objective } : {}),
           ...(num(b.maxSteps) !== undefined ? { maxSteps: num(b.maxSteps)! } : {}),

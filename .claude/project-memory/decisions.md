@@ -60,3 +60,4 @@ Format: date — decision — reason
 - Crash detection filters by package when known (other apps' crashes in the shared log are ignored); "process has died" only counts for the app under test and is HIGH, not CRITICAL.
 - Evidence file names are generated (EV-nnn.ext) and the task id is sanitised; files are 0600. The evidence directory is chosen by the caller, never by the model.
 - Blocked tasks carry machine-readable error codes (AgentResult.error): DEVICE_UNAVAILABLE, DEVICE_BUSY, NO_DEVICE_ASSIGNED, NO_CAPABLE_AGENT.
+- A-1: one web UI (src/ui) because it already had token/Host/CSP/size-limit defences; the unauthenticated Control Center API (src/api + web/) was removed after its audit findings. Its useful parts (provider presets, smoke test) were ported.

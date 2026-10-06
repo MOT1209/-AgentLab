@@ -86,7 +86,7 @@ a.btn{display:inline-block;padding:9px 14px;border:1px solid var(--line);border-
       <label id="l-kind"></label>
       <select id="kind"><option value="anthropic">Claude (Anthropic API)</option><option value="openai-compatible"></option></select>
       <label id="l-model"></label><input type="text" id="model" dir="ltr" value="claude-sonnet-5-5" autocomplete="off">
-      <div id="url-wrap" class="hide"><label id="l-url"></label><input type="text" id="baseUrl" dir="ltr" placeholder="http://localhost:11434/v1" autocomplete="off"></div>
+      <div id="url-wrap" class="hide"><label id="l-preset"></label><select id="preset"></select><label id="l-url"></label><input type="text" id="baseUrl" dir="ltr" placeholder="http://localhost:11434/v1" autocomplete="off"></div>
       <label id="l-key"></label><input type="password" id="apiKey" dir="ltr" autocomplete="off" placeholder="sk-ant-...">
       <div class="row mt10"><button class="primary" id="btn-save"></button><button id="btn-test"></button><button id="btn-clear"></button></div>
       <div id="model-status" class="note"></div>
@@ -95,9 +95,11 @@ a.btn{display:inline-block;padding:9px 14px;border:1px solid var(--line);border-
 
     <section class="card" id="card-run">
       <h2 id="t-run"></h2>
+      <div id="test-wrap" class="hide"><label id="l-test"></label><select id="testkind"><option value="explore"></option><option value="smoke"></option></select></div>
+      <div id="apk-wrap" class="hide"><label id="l-apk"></label><input type="text" id="apk" dir="ltr" placeholder="/path/to/app.apk" autocomplete="off"></div>
       <div id="pkg-wrap"><label id="l-pkg"></label><input type="text" id="pkg" dir="ltr" placeholder="com.example.app" autocomplete="off"></div>
-      <label id="l-obj"></label><textarea id="obj"></textarea>
-      <div class="row"><div><label id="l-steps"></label><input type="number" id="steps" min="1" max="200" value="15"></div><div><label id="l-time"></label><input type="number" id="time" min="10" max="1800" value="180"></div></div>
+      <div id="obj-wrap"><label id="l-obj"></label><textarea id="obj"></textarea>
+      <div class="row"><div><label id="l-steps"></label><input type="number" id="steps" min="1" max="200" value="15"></div><div><label id="l-time"></label><input type="number" id="time" min="10" max="1800" value="180"></div></div></div>
       <div class="row mt12"><button class="primary" id="btn-start"></button><button class="danger hide" id="btn-cancel"></button></div>
       <div id="run-err" class="err hide"></div>
     </section>
@@ -134,7 +136,7 @@ save:'حفظ',test:'اختبار الاتصال',clear:'مسح',notConf:'لم ي
 privacy:'تنبيه: نصوص واجهة التطبيق وأسطر السجل تُرسل إلى مزود النموذج. لا تختبر تطبيقاً يعرض بيانات شخصية حقيقية.',
 run:'3. الاختبار',pkg:'اسم الحزمة (Package) — يجب أن يكون التطبيق مثبتاً على الجهاز',obj:'ما الذي تريد البحث عنه؟',steps:'أقصى عدد خطوات',time:'المهلة (ثوانٍ)',
 objDef:'استكشف التطبيق وابحث عن الانهيارات وعطل التنقل والأزرار التي لا تستجيب ومشاكل الواجهة الواضحة.',
-start:'ابدأ الاختبار',cancel:'إيقاف',live:'النتيجة المباشرة',idle:'جاهز',running:'يعمل...',
+preset:'إعداد جاهز',noPreset:'(مخصص)',testKind:'نوع الاختبار',explore:'استكشاف بالذكاء الاصطناعي',smoke:'اختبار دخان (تثبيت وتشغيل وفحص الانهيار، بلا نموذج)',apk:'مسار ملف APK على هذا الكمبيوتر',needApk:'أدخل مسار ملف APK.',start:'ابدأ الاختبار',cancel:'إيقاف',live:'النتيجة المباشرة',idle:'جاهز',running:'يعمل...',
 empty:'لا يوجد تشغيل بعد. اختر الوضع واضغط «ابدأ الاختبار».',steps2:'الخطوات',find:'النتائج (Findings)',noFind:'لا نتائج.',
 verified:'مُتحقَّق منه',ai:'ملاحظة النموذج (غير مؤكدة)',download:'تنزيل التقرير (JSON)',
 PASSED:'نجح',FAILED:'فشل (عُثر على علّة)',BLOCKED:'متعثر',CANCELLED:'أُلغي',TIMEOUT:'انتهت المهلة',MAX_STEPS_REACHED:'بلغ حد الخطوات',BUDGET_EXCEEDED:'بلغ حد طلبات النموذج',ERROR:'خطأ',
@@ -149,7 +151,7 @@ save:'Save',test:'Test connection',clear:'Clear',notConf:'Model not configured y
 privacy:'Note: the app UI text and log lines are sent to the model provider. Do not test an app that shows real personal data.',
 run:'3. Test',pkg:'Package name — the app must already be installed on the device',obj:'What should it look for?',steps:'Max steps',time:'Timeout (seconds)',
 objDef:'Explore the application and identify crashes, broken navigation, unresponsive controls and obvious UI problems.',
-start:'Start test',cancel:'Stop',live:'Live result',idle:'Ready',running:'Running...',
+preset:'Preset',noPreset:'(custom)',testKind:'Test type',explore:'AI exploration',smoke:'Smoke test (install, launch, crash check; no model)',apk:'APK file path on this computer',needApk:'Enter the APK path.',start:'Start test',cancel:'Stop',live:'Live result',idle:'Ready',running:'Running...',
 empty:'No run yet. Pick a mode and press "Start test".',steps2:'Steps',find:'Findings',noFind:'No findings.',
 verified:'verified',ai:'model observation (unverified)',download:'Download report (JSON)',
 PASSED:'Passed',FAILED:'Failed (bug found)',BLOCKED:'Blocked',CANCELLED:'Cancelled',TIMEOUT:'Timed out',MAX_STEPS_REACHED:'Step limit reached',BUDGET_EXCEEDED:'LLM call limit reached',ERROR:'Error',
@@ -172,18 +174,28 @@ function showErr(id,msg){var e=$(id);if(msg){e.textContent=msg;e.classList.remov
 
 function applyText(){
   document.documentElement.lang=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';
-  var map={tagline:'tagline','t-mode':'mode','mode-demo':'demo','mode-real':'real','t-device':'device','btn-refresh':'refresh','device-help':'devHelp','t-model':'model','l-kind':'kind','l-model':'modelName','l-url':'url','l-key':'key','btn-save':'save','btn-test':'test','btn-clear':'clear','privacy':'privacy','t-run':'run','l-pkg':'pkg','l-obj':'obj','l-steps':'steps','l-time':'time','btn-start':'start','btn-cancel':'cancel','t-live':'live','empty':'empty','t-steps':'steps2','t-find':'find'};
+  var map={tagline:'tagline','t-mode':'mode','mode-demo':'demo','mode-real':'real','t-device':'device','btn-refresh':'refresh','device-help':'devHelp','t-model':'model','l-kind':'kind','l-model':'modelName','l-url':'url','l-preset':'preset','l-test':'testKind','l-apk':'apk','l-key':'key','btn-save':'save','btn-test':'test','btn-clear':'clear','privacy':'privacy','t-run':'run','l-pkg':'pkg','l-obj':'obj','l-steps':'steps','l-time':'time','btn-start':'start','btn-cancel':'cancel','t-live':'live','empty':'empty','t-steps':'steps2','t-find':'find'};
   for(var id in map){$(id).textContent=t(map[id])}
   $('kind').options[1].textContent=t('ocompat');
+  $('testkind').options[0].textContent=t('explore');$('testkind').options[1].textContent=t('smoke');
+  fillPresets();
+  var smoke=testKind()==='smoke';$('test-wrap').classList.toggle('hide',mode==='demo');$('apk-wrap').classList.toggle('hide',!(mode==='real'&&smoke));$('obj-wrap').classList.toggle('hide',smoke);$('card-model').classList.toggle('off',mode==='demo'||smoke);
   $('mode-note').textContent=t(mode==='demo'?'modeDemo':'modeReal');
   $('apiKey').placeholder=(last&&last.provider&&last.provider.keyPresent)?t('keySaved'):'sk-...';
   if(!$('obj').dataset.touched){$('obj').value=t('objDef')}
   $('lang-ar').classList.toggle('on',lang==='ar');$('lang-en').classList.toggle('on',lang==='en');
   $('mode-demo').classList.toggle('on',mode==='demo');$('mode-real').classList.toggle('on',mode==='real');
-  $('card-device').classList.toggle('off',mode==='demo');$('card-model').classList.toggle('off',mode==='demo');$('pkg-wrap').classList.toggle('hide',mode==='demo');
+  $('card-device').classList.toggle('off',mode==='demo');$('pkg-wrap').classList.toggle('hide',mode==='demo');
   if(last)render(last);
 }
 
+function testKind(){return mode==='real'&&$('testkind').value==='smoke'?'smoke':'explore'}
+function fillPresets(){
+  var sel=$('preset'),presets=(last&&last.presets)||[];
+  if(sel.options.length===presets.length+1){sel.options[0].textContent=t('noPreset');return}
+  sel.textContent='';var o=document.createElement('option');o.value='';o.textContent=t('noPreset');sel.appendChild(o);
+  presets.forEach(function(p){var x=document.createElement('option');x.value=p.id;x.textContent=p.label;sel.appendChild(x)});
+}
 function renderDevices(s){
   var box=$('devices');box.textContent='';
   var list=s.devices.list;
@@ -210,12 +222,12 @@ function pillFor(run){
   var pill=$('status');pill.className='pill';
   if(!run){pill.textContent=t('idle');return}
   if(run.status==='running'){pill.textContent=t('running');pill.classList.add('warn');return}
-  var st=run.result?run.result.status:'ERROR';
+  var st=run.smoke?run.smoke.status:(run.result?run.result.status:'ERROR');
   pill.textContent=t(st);
   pill.classList.add(st==='PASSED'||st==='MAX_STEPS_REACHED'?'ok':(st==='FAILED'||st==='ERROR'?'bad':'warn'));
 }
 function render(s){
-  renderDevices(s);renderModel(s);
+  last=s;fillPresets();renderDevices(s);renderModel(s);
   var run=s.run;
   pillFor(run);
   $('btn-cancel').classList.toggle('hide',!(run&&run.status==='running'));
@@ -223,7 +235,7 @@ function render(s){
   if(!run){$('empty').classList.remove('hide');$('live').classList.add('hide');$('bar').style.width='0';return}
   $('empty').classList.add('hide');$('live').classList.remove('hide');
   var evs=run.events,actions=evs.filter(function(e){return e.kind==='action'}),shots=evs.filter(function(e){return e.kind==='screenshot'});
-  $('bar').style.width=Math.min(100,Math.round(100*actions.length/run.params.maxSteps))+'%';
+  $('bar').style.width=run.smoke?'100%':Math.min(100,Math.round(100*actions.length/run.params.maxSteps))+'%';
   var tl=$('tl');tl.textContent='';
   actions.forEach(function(a){
     var li=el('li');li.appendChild(el('span','a','#'+a.step+' '+a.action));
@@ -248,13 +260,13 @@ function render(s){
     if(f.description){d.appendChild(el('div','note',f.description))}
     fb.appendChild(d);
   });
-  $('summary').textContent=run.result?run.result.summary:(run.error||'');
+  $('summary').textContent=run.smoke?run.smoke.summary:(run.result?run.result.summary:(run.error||''));
   var tel=$('telemetry');tel.textContent='';
   if(run.result){var m=run.result.telemetry;
     [m.actions+' '+t('actions')+' ('+m.actionFailures+' '+t('failed')+')',m.llmCalls+' '+t('calls'),m.inputTokens+'/'+m.outputTokens+' '+t('tokens'),(m.durationMs/1000).toFixed(1)+' '+t('secs')].forEach(function(x){tel.appendChild(el('span',null,x))});
   }
   var dl=$('dl');dl.textContent='';
-  if(run.result){var a=el('a','btn',t('download'));a.href='/api/run/report?t='+encodeURIComponent(token||'');dl.appendChild(a)}
+  if(run.result||run.smoke){var a=el('a','btn',t('download'));a.href='/api/run/report?t='+encodeURIComponent(token||'');dl.appendChild(a)}
 }
 function refresh(){
   if(!token){showErr('run-err',t('noToken'));return Promise.resolve()}
@@ -266,6 +278,8 @@ $('lang-ar').addEventListener('click',function(){lang='ar';try{localStorage.setI
 $('lang-en').addEventListener('click',function(){lang='en';try{localStorage.setItem('lang','en')}catch(e){}applyText()});
 $('mode-demo').addEventListener('click',function(){mode='demo';applyText()});
 $('mode-real').addEventListener('click',function(){mode='real';applyText();$('btn-refresh').click()});
+$('testkind').addEventListener('change',applyText);
+$('preset').addEventListener('change',function(){var id=$('preset').value,ps=(last&&last.presets)||[];for(var i=0;i<ps.length;i++){if(ps[i].id===id){$('baseUrl').value=ps[i].baseUrl;$('model').value=ps[i].exampleModel;$('apiKey').placeholder=ps[i].requiresKey?'API key':'(optional)'}}});
 $('obj').addEventListener('input',function(){$('obj').dataset.touched='1'});
 $('kind').addEventListener('change',function(){var o=$('kind').value==='openai-compatible';$('url-wrap').classList.toggle('hide',!o);$('model').value=o?'':'claude-sonnet-5-5';$('apiKey').placeholder=o?'(optional)':'sk-ant-...'});
 $('btn-refresh').addEventListener('click',function(){showErr('device-err');api('POST','/api/devices/refresh').then(function(s){last=s;render(s)}).catch(function(e){showErr('device-err',e.message)})});
@@ -279,11 +293,12 @@ $('btn-start').addEventListener('click',function(){
   showErr('run-err');
   if(mode==='real'){
     if(!selected){return showErr('run-err',t('needDev'))}
-    if(!last||!last.provider.configured){return showErr('run-err',t('needModel'))}
+    if(testKind()==='explore'&&(!last||!last.provider.configured)){return showErr('run-err',t('needModel'))}
+    if(testKind()==='smoke'&&!$('apk').value.trim()){return showErr('run-err',t('needApk'))}
     if(!$('pkg').value.trim()){return showErr('run-err',t('needPkg'))}
   }
   busy=true;bigId=null;
-  api('POST','/api/run',{mode:mode,package:$('pkg').value,objective:$('obj').value,maxSteps:Number($('steps').value),timeoutMs:Number($('time').value)*1000,deviceId:selected||undefined})
+  api('POST','/api/run',{mode:mode,test:testKind(),apkPath:$('apk').value,package:$('pkg').value,objective:$('obj').value,maxSteps:Number($('steps').value),timeoutMs:Number($('time').value)*1000,deviceId:selected||undefined})
    .then(function(){busy=false;return refresh()}).catch(function(e){busy=false;showErr('run-err',e.message)});
 });
 $('btn-cancel').addEventListener('click',function(){api('POST','/api/run/cancel').then(refresh).catch(function(e){showErr('run-err',e.message)})});

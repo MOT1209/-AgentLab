@@ -5,8 +5,7 @@ cherry-picked (explore example, local web UI in src/ui, Phase 4.5 real-device pa
 evidence on disk, opt-in real-device test). Reconciled with Phase 5/6: ONE budget mechanism (task maxLlmCalls clamped by the agent profile ceiling;
 profile adds maxTokens; single status BUDGET_EXCEEDED -> BLOCKED); discover now returns {added, skipped (already known), rejected (unusable, with
 reason)} and the Control Center lists rejected devices; PROGRESS bus events stream through the API's SSE. 182 tests pass, 2 skipped (need a real adb
-binary / REAL_DEVICE_TEST=1). TWO web UIs now exist: src/ui (`npm run ui`, demo + real-device modes) and src/api + web/ (`npm run dev:api`,
-bilingual Control Center). Consolidating them is an open decision.
+binary / REAL_DEVICE_TEST=1). P1 (A-1): the two web UIs were merged into src/ui (`npm run ui`: demo + real device, provider presets, smoke test); src/api, web/ and `dev:api` were removed.
 
 Phase 6 - skill architecture done (src/skills/, see skills-architecture.md and knowledge/skills.md). One canonical SkillDefinition catalog
 (6 implemented skills + ai-testing-lab manual + MCP guide planned/documented + 12 planned entries), SkillRegistry, SkillResolver, permission model,
