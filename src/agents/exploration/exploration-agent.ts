@@ -90,7 +90,7 @@ export async function runExploration(deps: ExplorationDeps): Promise<Exploration
   const supported = deps.permissions ? new Set([...deviceActions].filter((x) => actionAllowed(x, deps.permissions!))) : deviceActions;
   const limits: ValidationLimits = { supported, ...(task.screen ? { screen: task.screen } : {}) };
   const history: ActionRecord[] = [];
-  const tel: ExplorationTelemetry = { llmCalls: 0, actions: 0, actionFailures: 0, providerErrors: 0, deviceErrors: 0, malformedResponses: 0, inputTokens: 0, outputTokens: 0, durationMs: 0 };
+  const tel: ExplorationTelemetry = { llmCalls: 0, actions: 0, actionFailures: 0, providerErrors: 0, deviceErrors: 0, malformedResponses: 0, sensitiveRefusals: 0, inputTokens: 0, outputTokens: 0, durationMs: 0 };
 
   // One controller for both timeout and external cancellation. `stop` records which one fired first.
   const ctrl = new AbortController();
@@ -320,7 +320,10 @@ export async function runExploration(deps: ExplorationDeps): Promise<Exploration
       const result: ActionOutcome = blocked
         ? { ok: false, detail: `refused: that control looks like a ${blocked.category} action ("${blocked.label}"). Tapping it is blocked for this run; test around it instead.`, errorCode: "SENSITIVE_ACTION_BLOCKED", deviceError: false, evidenceIds: [] }
         : await executor.execute(decision.action, step, ctrl.signal);
-      if (blocked) log("action_blocked", { agentId, step, category: blocked.category });
+      if (blocked) {
+        tel.sensitiveRefusals++;
+        log("action_blocked", { agentId, step, category: blocked.category });
+      }
       if (!result.ok) {
         // A failed action keeps the log tail as evidence, so a launch failure can be diagnosed afterwards.
         try {

@@ -391,6 +391,8 @@ test("a tap on a paid or destructive control never reaches the device and is rep
   assert.match(blocked.detail, /refused.*purchase/s);
   // the model is told why, so it can choose a different element
   assert.match(llm.requests[1]!.messages[0]!.content, /refused/);
+  // and the refusal is counted in telemetry
+  assert.equal(r.telemetry.sensitiveRefusals, 1);
 });
 
 test("allowSensitiveActions lets the same tap through", async () => {
@@ -401,6 +403,7 @@ test("allowSensitiveActions lets the same tap through", async () => {
 
   assert.deepEqual(device.trace, ["tap:200,240"]);
   assert.deepEqual([r.actionLog[0]!.ok, r.actionLog[0]!.errorCode], [true, undefined]);
+  assert.equal(r.telemetry.sensitiveRefusals, 0);
 });
 
 test("allowSensitiveActions is off unless the caller asks for it", () => {

@@ -10,6 +10,8 @@ export interface ExplorationTelemetry {
   providerErrors: number;
   deviceErrors: number;
   malformedResponses: number;
+  /** TAPs refused by the deterministic sensitive-action guard (paid/destructive controls). */
+  sensitiveRefusals: number;
   inputTokens: number;
   outputTokens: number;
   durationMs: number;
