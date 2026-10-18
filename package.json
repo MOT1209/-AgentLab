@@ -16,6 +16,7 @@
     "skills:sync": "tsc && node dist/src/skills/cli.js sync",
     "explore": "tsc && node dist/examples/explore.js",
     "ui": "tsc && node dist/src/ui/main.js",
+    "mcp": "tsc && node dist/src/mcp/main.js",
     "test:real": "tsc && REAL_DEVICE_TEST=1 node --test dist/test/real-device.test.js"
   },
   "devDependencies": {
