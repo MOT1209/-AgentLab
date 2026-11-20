@@ -1,5 +1,16 @@
 # CURRENT PHASE
 
+P3 (second item) — Edge Case Agent done. MAIN-05-B handles `edge-case` (src/agents/behaviors/edge-case.ts): deterministic, NO LLM.
+Survey of the start screen (text fields, submit control by EN/DE/AR label, sensitive ones skipped), then cases, each from a
+clean STOP/LAUNCH: field x input matrix (EDGE_INPUTS or caller's ASCII list) and sequences (double submit, empty submit, back
+after submit, rapid relaunch x3, background during input, back past the root, rapid taps per control; their budget is reserved
+before the matrix). Outcomes OK/CRASH/LEFT_APP/FIELD_GONE in result.cases; crash description names field+input or sequence;
+repro steps and replay cover only that case. Profile step ceiling (200) stops new cases. Shared machinery extracted to
+src/agents/behaviors/deterministic-session.ts (DeterministicSession); Crash Hunter rebuilt on it with identical action sequence
+(verified by diffing the mock run before/after). CLI `npm run edge-case`, web UI test type "Edge cases" (demo form: Age -1 crashes).
+234 tests pass, 2 skipped. Demo checked in headless Chromium (AR). Never run on a real device.
+Next: real device run; benchmark app vs adb monkey; Stability Tester (MAIN-04-B).
+
 P3 (first item) — Crash Hunter done. MAIN-04-A (Crash & Stability Tester / Crash Hunter) handles `crash-hunt`
 (src/agents/behaviors/crash-hunter.ts): deterministic, seeded, NO LLM. Phases: cold starts, background/resume, stress over UI
 controls (tap, boundary-value TYPE in text fields, swipe, back, relaunch; coordinate taps when there is no hierarchy).

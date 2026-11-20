@@ -224,3 +224,21 @@ test("demo crash hunt: no model needed, the planted crash is found, confirmed an
   assert.equal(bad.status, 400);
   await s.close();
 });
+
+test("demo edge cases: the crash is pinned to the Age field with -1, confirmed, and cases are in the result", async () => {
+  const s = await start();
+  assert.equal((await s.call("POST", "/api/run", { mode: "demo", test: "edge-case" })).status, 202);
+  await waitFor(async () => (await s.call("GET", "/api/state")).json.run.status !== "running", 60_000);
+  const run = (await s.call("GET", "/api/state")).json.run;
+  assert.equal(run.status, "finished");
+  assert.equal(run.test, "edge-case");
+  assert.equal(run.result.agentId, "MAIN-05-B");
+  assert.equal(run.result.status, "FAILED");
+  const crash = run.result.cases.find((c: { outcome: string }) => c.outcome === "CRASH");
+  assert.deepEqual([crash.field, crash.input], ["age", "-1"]);
+  assert.equal(run.result.findings[0].reproduced, "CONFIRMED");
+  assert.equal(run.result.telemetry.llmCalls, 0);
+  assert.equal((await s.call("GET", "/api/run/report.html?lang=ar")).status, 200);
+  assert.equal((await s.call("POST", "/api/run", { mode: "demo", test: "edge-case", maxSteps: 301 })).status, 400);
+  await s.close();
+});
