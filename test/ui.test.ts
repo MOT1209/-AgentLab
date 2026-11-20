@@ -242,3 +242,21 @@ test("demo edge cases: the crash is pinned to the Age field with -1, confirmed, 
   assert.equal((await s.call("POST", "/api/run", { mode: "demo", test: "edge-case", maxSteps: 301 })).status, 400);
   await s.close();
 });
+
+test("demo stability run: the leak and the one-off crash are found, metrics are in the result", async () => {
+  const s = await start();
+  assert.equal((await s.call("POST", "/api/run", { mode: "demo", test: "stability" })).status, 202);
+  await waitFor(async () => (await s.call("GET", "/api/state")).json.run.status !== "running", 60_000);
+  const run = (await s.call("GET", "/api/state")).json.run;
+  assert.equal(run.status, "finished");
+  assert.equal(run.test, "stability");
+  assert.equal(run.result.agentId, "MAIN-04-B");
+  assert.equal(run.result.status, "FAILED");
+  assert.equal(run.result.metrics.memory.verdict, "GROWS");
+  assert.deepEqual(run.result.metrics.crashRates.map((r: { occurrences: number; cycles: number }) => [r.occurrences, r.cycles]), [[1, 15]]);
+  assert.match(run.result.findings[0].description, /cold cycle 4 of 5/);
+  assert.equal(run.result.telemetry.llmCalls, 0);
+  assert.equal((await s.call("GET", "/api/run/report.html?lang=ar")).status, 200);
+  assert.equal((await s.call("POST", "/api/run", { mode: "demo", test: "stability", maxSteps: 101 })).status, 400);
+  await s.close();
+});

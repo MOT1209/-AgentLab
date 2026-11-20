@@ -31,6 +31,8 @@ export interface FakeAdb {
   calls: () => string[];
   /** Replace the logcat content. */
   setLog: (text: string) => void;
+  /** Replace the `dumpsys meminfo` output. */
+  setMeminfo: (text: string) => void;
 }
 
 import { readFileSync } from "node:fs";
@@ -47,6 +49,7 @@ export function createFakeAdb(opts: { state?: string } = {}): FakeAdb {
   writeFileSync(join(dir, "ui.xml"), FAKE_UI_XML);
   writeFileSync(join(dir, "log.txt"), "I/ActivityManager: boot completed\n");
   writeFileSync(join(dir, "calls.txt"), "");
+  writeFileSync(join(dir, "mem.txt"), "No process found for: com.fake.app\n");
   const bin = join(dir, "adb");
   const state = opts.state ?? "device";
   writeFileSync(
@@ -67,6 +70,7 @@ case "$*" in
   "exec-out screencap -p") cat "$D/screen.png" ;;
   "exec-out uiautomator dump /dev/tty") cat "$D/ui.xml" ;;
   "logcat -c") : > "$D/log.txt" ;;
+  shell\\ dumpsys\\ meminfo\\ *) cat "$D/mem.txt" ;;
   logcat\\ -d\\ -t\\ *) cat "$D/log.txt" ;;
   shell\\ monkey\\ *com.fake.crash*) printf '01-01 10:00:00.000  100  100 E AndroidRuntime: FATAL EXCEPTION: main\\n01-01 10:00:00.001  100  100 E AndroidRuntime: Process: com.fake.crash, PID: 100\\n01-01 10:00:00.002  100  100 E AndroidRuntime: java.lang.IllegalStateException: boom\\n' >> "$D/log.txt" ;;
   shell\\ monkey\\ *|shell\\ am\\ start\\ *|shell\\ am\\ force-stop\\ *|shell\\ input\\ *) : ;;
@@ -81,5 +85,6 @@ esac
     dir,
     calls: () => readFileSync(join(dir, "calls.txt"), "utf8").split("\n").filter(Boolean),
     setLog: (text) => writeFileSync(join(dir, "log.txt"), text),
+    setMeminfo: (text) => writeFileSync(join(dir, "mem.txt"), text),
   };
 }

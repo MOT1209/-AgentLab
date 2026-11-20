@@ -20,7 +20,7 @@ Source of truth in code: `src/agents/organization.ts`. A test keeps this file in
 ## MAIN-04 Crash & Stability Tester
 
 - MAIN-04-A Crash Hunter — behavior: `crash-hunt` (src/agents/behaviors/crash-hunter.ts), seeded stress, no LLM
-- MAIN-04-B Stability Tester
+- MAIN-04-B Stability Tester — behavior: `stability` (src/agents/behaviors/stability.ts), cold/warm cycles, memory leak + crash rate, no LLM
 
 ## MAIN-05 Exploratory Tester
 

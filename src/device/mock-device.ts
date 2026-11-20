@@ -63,6 +63,12 @@ export class MockDevice implements Device {
     this.guard("pressKey");
     this.trace.push(`key:${key}`);
   }
+  /** Memory source for tests and demos (KB). Undefined: the process is not running / unknown. */
+  memoryFn?: () => number | undefined;
+  async memoryKb(pkg: string): Promise<number | undefined> {
+    this.guard("memoryKb");
+    return this.running.has(pkg) ? this.memoryFn?.() : undefined;
+  }
   async clearLogs(): Promise<void> {
     this.guard("clearLogs");
     this.extraLogs = [];

@@ -6,6 +6,7 @@ import { initializeAgentLab } from "../bootstrap.js";
 import { demoScreenshot } from "./demo-png.js";
 import { parseCrashHuntTask, type CrashHuntTask } from "../agents/behaviors/crash-hunter.js";
 import { parseEdgeCaseTask, type EdgeCaseTask } from "../agents/behaviors/edge-case.js";
+import { parseStabilityTask, type StabilityTask } from "../agents/behaviors/stability.js";
 import { MockProvider } from "../providers/mock-provider.js";
 import { ProviderManager } from "../providers/manager.js";
 import type { ProviderConfig } from "../providers/types.js";
@@ -41,7 +42,8 @@ export interface RunInput {
   mode: "demo" | "real";
   /**
    * "explore" (LLM-driven, default), "crash-hunt" (seeded stress, no LLM; demo or real),
-   * "edge-case" (boundary-value and sequence matrix, no LLM; demo or real) or
+   * "edge-case" (boundary-value and sequence matrix, no LLM; demo or real),
+   * "stability" (repeated cold starts and warm resumes: memory leaks and intermittent crashes, no LLM; demo or real) or
    * "smoke" (install, launch, crash check; no LLM; real device only).
    */
   test?: TestKind;
@@ -90,7 +92,7 @@ interface RunState {
   abort: AbortController;
 }
 
-export type TestKind = "explore" | "smoke" | "crash-hunt" | "edge-case";
+export type TestKind = "explore" | "smoke" | "crash-hunt" | "edge-case" | "stability";
 const MAX_EVENTS = 1000;
 /** Retention: finished real runs kept in SQLite; older ones are pruned on every save. */
 const MAX_STORED_RUNS = 50;
@@ -189,7 +191,7 @@ export class UiApp {
   startRun(input: RunInput): { id: string } {
     if (this.run?.status === "running") throw new UiError(409, "A run is already in progress.");
     const demo = input.mode === "demo";
-    const test: TestKind = input.test === "smoke" || input.test === "crash-hunt" || input.test === "edge-case" ? input.test : "explore";
+    const test: TestKind = input.test === "smoke" || input.test === "crash-hunt" || input.test === "edge-case" || input.test === "stability" ? input.test : "explore";
     if (test === "smoke" && demo) throw new UiError(400, "The smoke test needs a real device.");
     const apkPath = (input.apkPath ?? "").trim();
     if (test === "smoke" && (!apkPath || apkPath.startsWith("-") || !/\.apk$/i.test(apkPath))) throw new UiError(400, "APK path is required and must end in .apk.");
@@ -235,6 +237,18 @@ export class UiApp {
       if (!e.ok) throw new UiError(400, e.errors.join("; "));
       edge = e.task;
     }
+    let stab: StabilityTask | undefined;
+    if (test === "stability") {
+      const st = parseStabilityTask({
+        app: { packageName: pkg },
+        warmCycles: input.maxSteps ?? (demo ? 10 : 20),
+        coldCycles: demo ? 5 : 10,
+        settleMs: demo ? 200 : 1500,
+        timeoutMs: input.timeoutMs ?? 1_200_000,
+      });
+      if (!st.ok) throw new UiError(400, st.errors.join("; "));
+      stab = st.task;
+    }
 
     let rt;
     let deviceId: string;
@@ -242,6 +256,10 @@ export class UiApp {
       const fleet = createMockFleet(12);
       if (hunt) {
         demoDevice(fleet[3]!, true);
+        rt = initializeAgentLab({ devices: fleet });
+        deviceId = "DEVICE-04 (demo)";
+      } else if (stab) {
+        demoLeak(fleet[3]!);
         rt = initializeAgentLab({ devices: fleet });
         deviceId = "DEVICE-04 (demo)";
       } else if (edge) {
@@ -258,7 +276,7 @@ export class UiApp {
       if (test === "explore" && !this.providers) throw new UiError(400, "Configure the AI model first.");
       const snap = this.devices.describe(input.deviceId)!;
       if (snap.state !== "ONLINE") throw new UiError(400, `Device ${input.deviceId} is ${snap.state}.`);
-      const mainId = test === "smoke" ? "MAIN-01" : test === "crash-hunt" ? "MAIN-04" : "MAIN-05";
+      const mainId = test === "smoke" ? "MAIN-01" : test === "crash-hunt" || test === "stability" ? "MAIN-04" : "MAIN-05";
       if (this.devices.getAssignment(mainId)) this.devices.unassign(mainId);
       rt = initializeAgentLab({ devices: [], deviceManager: this.devices, providers: this.providers ?? new ProviderManager(), assignments: { [mainId]: input.deviceId } });
       deviceId = input.deviceId;
@@ -272,6 +290,8 @@ export class UiApp {
       startedAt: new Date().toISOString(),
       params: hunt
         ? { package: pkg, objective: `Crash hunt, seed ${hunt.seed}`, maxSteps: hunt.maxActions + hunt.coldStarts * 3 + 4, timeoutMs: hunt.timeoutMs, deviceId }
+        : stab
+        ? { package: pkg, objective: `Stability: ${stab.coldCycles} cold, ${stab.warmCycles} warm cycle(s)`, maxSteps: stab.coldCycles * 3 + stab.warmCycles * 4 + 4, timeoutMs: stab.timeoutMs, deviceId }
         : edge
         ? { package: pkg, objective: `Edge cases, up to ${edge.maxCases} case(s)`, maxSteps: edge.maxCases * 7 + 3, timeoutMs: edge.timeoutMs, deviceId }
         : { package: pkg, objective, maxSteps: parsed.task.maxSteps, timeoutMs: parsed.task.timeoutMs, deviceId },
@@ -311,6 +331,8 @@ export class UiApp {
         }
         const task = hunt
           ? await rt.orchestrator.dispatch("MAIN-04", "crash-hunt", hunt, { signal: run.abort.signal })
+          : stab
+          ? await rt.orchestrator.dispatch("MAIN-04", "stability", stab, { signal: run.abort.signal })
           : edge
           ? await rt.orchestrator.dispatch("MAIN-05", "edge-case", edge, { signal: run.abort.signal })
           : await rt.orchestrator.dispatch("MAIN-05", "explore", { objective, app: { packageName: pkg }, maxSteps: parsed.task.maxSteps, timeoutMs: parsed.task.timeoutMs, ...extra }, { signal: run.abort.signal });
@@ -516,5 +538,28 @@ function demoForm(d: MockDevice): void {
   d.type = async (t) => {
     await type(t);
     if (focused === "age") age += t;
+  };
+}
+
+/** Demo for the stability test: memory grows 6 MB per resume while the process lives; the 4th launch crashes once. */
+function demoLeak(d: MockDevice): void {
+  demoDevice(d);
+  let resumes = 0;
+  let launches = 0;
+  d.memoryFn = () => 80_000 + resumes * 6 * 1024;
+  const { launch, stop } = { launch: d.launch.bind(d), stop: d.stop.bind(d) };
+  d.stop = async (p) => {
+    await stop(p);
+    resumes = 0;
+  };
+  d.launch = async (p, a) => {
+    const wasRunning = d.isRunning(p);
+    await launch(p, a);
+    if (wasRunning) resumes++;
+    if (++launches === 4) {
+      d.appendLog("11-20 10:00:00.000  4242  4242 E AndroidRuntime: FATAL EXCEPTION: main");
+      d.appendLog("11-20 10:00:00.001  4242  4242 E AndroidRuntime: Process: com.example.demo, PID: 4242");
+      d.appendLog("11-20 10:00:00.002  4242  4242 E AndroidRuntime: java.lang.IllegalStateException: cache not ready (demo, happens on one launch only)");
+    }
   };
 }

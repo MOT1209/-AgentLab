@@ -44,6 +44,8 @@ export interface Device {
   /** Current UI hierarchy. */
   ui?(): Promise<UiNode[]>;
   clearLogs?(): Promise<void>;
+  /** Total PSS of the app's process in KB, or undefined when it is not running. Read-only; used for leak detection. */
+  memoryKb?(packageName: string): Promise<number | undefined>;
 }
 
 export class DeviceError extends Error {
