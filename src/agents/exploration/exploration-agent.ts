@@ -5,9 +5,10 @@ import type { AgentLimits } from "../../skills/types.js";
 import type { HandlerContext, TaskHandler } from "../managed-agent.js";
 import type { AgentResult } from "../types.js";
 import { ActionExecutor, ActionOutcome } from "./action-executor.js";
+import { confirmCrashReplays, reproStepsFrom } from "./crash-confirm.js";
 import { createFileEvidenceWriter, writeResultFile } from "./evidence-files.js";
 import { supportedActions, ValidationLimits } from "./action-validator.js";
-import type { AgentAction, AgentDecision } from "./actions.js";
+import type { AgentDecision } from "./actions.js";
 import { requestDecision } from "./decision.js";
 import { EvidenceStore } from "./evidence.js";
 import { detectCrash, Finding, FindingLog, hasVerifiedFailure, relevantLogLines } from "./findings.js";
@@ -55,18 +56,8 @@ function clampTask(task: ExplorationTask, ceilings?: AgentLimits): ExplorationTa
 }
 
 const REPEAT_WARN_AT = 3;
-/** Only actions that change app state are replayed or listed as reproduction steps. */
-const REPLAYABLE = new Set(["LAUNCH_APP", "STOP_APP", "TAP", "TYPE", "SWIPE", "BACK", "HOME", "WAIT"]);
-const CONFIRM_MAX_FINDINGS = 3;
-const CONFIRM_MAX_MS = 90_000;
 /** Largest screenshot (base64 chars) sent to the model; bigger ones are skipped rather than failing the call. */
 const MAX_VISION_B64 = 5_000_000;
-
-function describeStep(h: ActionRecord): string {
-  const p = (h.params ?? {}) as { target?: { x: number; y: number }; text?: string; from?: { x: number; y: number }; to?: { x: number; y: number }; ms?: number };
-  const arg = h.action === "TAP" && p.target ? ` (${p.target.x}, ${p.target.y})` : h.action === "TYPE" ? ` "${String(p.text ?? "")}"` : h.action === "SWIPE" && p.from && p.to ? ` (${p.from.x}, ${p.from.y}) -> (${p.to.x}, ${p.to.y})` : h.action === "WAIT" ? ` ${p.ms ?? ""} ms` : "";
-  return `${h.action}${arg}`;
-}
 const REPEAT_STOP_AT = 5;
 
 /**
@@ -122,48 +113,7 @@ export async function runExploration(deps: ExplorationDeps): Promise<Exploration
   /** Replays the steps behind each verified crash (bounded) and records whether it happened again. Never throws. */
   const confirmCrashes = async (): Promise<string | undefined> => {
     if (!task.confirmCrashes || !packageName || !(await deviceAlive())) return undefined;
-    const replay = new ActionExecutor(device, { evidence: new EvidenceStore(agentId, undefined, now), packageName, ...(task.app?.launchActivity ? { launchActivity: task.app.launchActivity } : {}), ...(deps.sleep ? { sleep: deps.sleep } : {}) });
-    const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
-    const targets = findings.all().filter((f) => f.source === "VERIFIED" && f.reproSteps).slice(0, CONFIRM_MAX_FINDINGS);
-    let confirmed = 0;
-    for (const f of targets) {
-      const steps = history.filter((h) => h.ok && h.step <= f.step && h.params && REPLAYABLE.has(h.action));
-      let outcome: NonNullable<Finding["reproduced"]> = "NOT_REPRODUCED";
-      const deadline = now() + CONFIRM_MAX_MS;
-      try {
-        if (steps.length === 0) outcome = "INCONCLUSIVE";
-        else {
-          await device.stop(packageName).catch(() => undefined);
-          await device.clearLogs?.();
-          if (steps[0]!.action !== "LAUNCH_APP") await device.launch(packageName, task.app?.launchActivity);
-          for (const h of steps) {
-            if (deps.signal?.aborted || now() > deadline) {
-              outcome = "INCONCLUSIVE";
-              break;
-            }
-            const out = await replay.execute(h.params as unknown as AgentAction, h.step);
-            if (!out.ok && out.deviceError) {
-              outcome = "INCONCLUSIVE";
-              break;
-            }
-            if (detectCrash(await device.logs(100), packageName)?.title === f.title) {
-              outcome = "CONFIRMED";
-              break;
-            }
-          }
-          if (outcome === "NOT_REPRODUCED") {
-            await sleep(1500); // a crash can land just after the last action
-            if (detectCrash(await device.logs(100), packageName)?.title === f.title) outcome = "CONFIRMED";
-          }
-        }
-      } catch {
-        outcome = "INCONCLUSIVE";
-      }
-      if (outcome === "CONFIRMED") confirmed++;
-      findings.annotate(f.id, { reproduced: outcome });
-      emit({ kind: "confirm", id: f.id, result: outcome });
-    }
-    return targets.length > 0 ? ` Crash confirmation: ${confirmed} of ${targets.length} reproduced by replaying the steps.` : undefined;
+    return confirmCrashReplays({ device, agentId, packageName, ...(task.app?.launchActivity ? { launchActivity: task.app.launchActivity } : {}), findings, history, ...(deps.signal ? { signal: deps.signal } : {}), now, ...(deps.sleep ? { sleep: deps.sleep } : {}), emit });
   };
 
   const finish = async (status: ExplorationStatus, why: string): Promise<ExplorationResult> => {
@@ -246,7 +196,7 @@ export async function runExploration(deps: ExplorationDeps): Promise<Exploration
         const logEv = evidence.add("log", crash.excerpt, step);
         const f = findings.addVerified(crash.signature, crash.severity, crash.title, `Detected in device logs after step ${step}${crash.process ? ` (process ${crash.process})` : ""}${crash.exception ? `, ${crash.exception}` : ""}: ${crash.excerpt.split("\n")[0]}`, [logEv?.id, obs.screenshotRef].filter((x): x is string => !!x), step);
         if (f) {
-          findings.annotate(f.id, { reproSteps: history.filter((h) => h.ok && REPLAYABLE.has(h.action)).map((h, i) => `${i + 1}. ${describeStep(h)}`) });
+          findings.annotate(f.id, { reproSteps: reproStepsFrom(history) });
           errors.push(`CRASH DETECTED (${f.id}): ${crash.title}`);
           emit({ kind: "finding", id: f.id, severity: f.severity, title: f.title, source: f.source });
           log("crash", { agentId, finding: f.id, step });

@@ -10,3 +10,4 @@
 - Phase 4: Exploration Agent (MAIN-05-A): typed action model + validator + safe executor, bounded LLM loop (maxSteps/timeout/cancel), evidence + findings (verified vs AI), Device swipe/pressKey/ui/clearLogs (+AdbDevice), provider jsonSchema/signal, MockProvider scripting; 98 tests pass.
 - UI: local web UI (npm run ui), AR/EN, demo + real modes, live steps/screenshots/findings, cancel, report download; server security tests; 108 tests pass; demo flow checked in headless Chromium.
 - Phase 4.5 (partial): health gating, structured device errors, LLM-call budget, package-aware crash detection, evidence persistence, activity launch, UNSUPPORTED_ACTION, simulated-adb e2e, opt-in real-device test, docs; 126 tests (+1 opt-in skipped). Real-device proof still pending.
+- P3 (1): Crash Hunter MAIN-04-A (`crash-hunt`, seeded stress, no LLM), shared crash replay module, CLI + web UI (demo/real), 15 new tests; demo verified in headless Chromium.

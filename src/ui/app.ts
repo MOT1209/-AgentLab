@@ -4,6 +4,7 @@ import { parseExplorationTask } from "../agents/exploration/task.js";
 import type { ExplorationResult } from "../agents/exploration/result.js";
 import { initializeAgentLab } from "../bootstrap.js";
 import { demoScreenshot } from "./demo-png.js";
+import { parseCrashHuntTask, type CrashHuntTask } from "../agents/behaviors/crash-hunter.js";
 import { MockProvider } from "../providers/mock-provider.js";
 import { ProviderManager } from "../providers/manager.js";
 import type { ProviderConfig } from "../providers/types.js";
@@ -37,8 +38,13 @@ export interface ProviderInput {
 
 export interface RunInput {
   mode: "demo" | "real";
-  /** "explore" (LLM-driven, default) or "smoke" (install, launch, crash check; no LLM). Smoke is real-device only. */
-  test?: "explore" | "smoke";
+  /**
+   * "explore" (LLM-driven, default), "crash-hunt" (seeded stress, no LLM; demo or real) or
+   * "smoke" (install, launch, crash check; no LLM; real device only).
+   */
+  test?: TestKind;
+  /** Crash hunt only: same seed, same action sequence. */
+  seed?: number;
   /** Smoke only: path of the APK to install. */
   apkPath?: string;
   /** Explore only. Stop once the estimated cost reaches this many USD. Needs both prices. */
@@ -67,7 +73,7 @@ interface RunEvent {
 interface RunState {
   id: string;
   mode: "demo" | "real";
-  test: "explore" | "smoke";
+  test: TestKind;
   status: "running" | "finished" | "error";
   startedAt: string;
   finishedAt?: string;
@@ -82,6 +88,7 @@ interface RunState {
   abort: AbortController;
 }
 
+export type TestKind = "explore" | "smoke" | "crash-hunt";
 const MAX_EVENTS = 1000;
 /** Retention: finished real runs kept in SQLite; older ones are pruned on every save. */
 const MAX_STORED_RUNS = 50;
@@ -180,7 +187,7 @@ export class UiApp {
   startRun(input: RunInput): { id: string } {
     if (this.run?.status === "running") throw new UiError(409, "A run is already in progress.");
     const demo = input.mode === "demo";
-    const test = input.test === "smoke" ? "smoke" : "explore";
+    const test: TestKind = input.test === "smoke" ? "smoke" : input.test === "crash-hunt" ? "crash-hunt" : "explore";
     if (test === "smoke" && demo) throw new UiError(400, "The smoke test needs a real device.");
     const apkPath = (input.apkPath ?? "").trim();
     if (test === "smoke" && (!apkPath || apkPath.startsWith("-") || !/\.apk$/i.test(apkPath))) throw new UiError(400, "APK path is required and must end in .apk.");
@@ -202,20 +209,38 @@ export class UiApp {
       ...extra,
     });
     if (!parsed.ok) throw new UiError(400, parsed.errors.join("; "));
+    let hunt: CrashHuntTask | undefined;
+    if (test === "crash-hunt") {
+      const h = parseCrashHuntTask({
+        app: { packageName: pkg },
+        maxActions: input.maxSteps ?? (demo ? 15 : 60),
+        coldStarts: demo ? 1 : 3,
+        timeoutMs: input.timeoutMs ?? 300_000,
+        ...(input.seed !== undefined ? { seed: input.seed } : {}),
+      });
+      if (!h.ok) throw new UiError(400, h.errors.join("; "));
+      hunt = h.task;
+    }
 
     let rt;
     let deviceId: string;
     if (demo) {
       const fleet = createMockFleet(12);
-      demoDevice(fleet[4]!);
-      rt = initializeAgentLab({ devices: fleet, providers: demoProviders() });
-      deviceId = "DEVICE-05 (demo)";
+      if (hunt) {
+        demoDevice(fleet[3]!, true);
+        rt = initializeAgentLab({ devices: fleet });
+        deviceId = "DEVICE-04 (demo)";
+      } else {
+        demoDevice(fleet[4]!);
+        rt = initializeAgentLab({ devices: fleet, providers: demoProviders() });
+        deviceId = "DEVICE-05 (demo)";
+      }
     } else {
       if (!input.deviceId || !this.devices.getDevice(input.deviceId)) throw new UiError(400, "Select a connected device first.");
       if (test === "explore" && !this.providers) throw new UiError(400, "Configure the AI model first.");
       const snap = this.devices.describe(input.deviceId)!;
       if (snap.state !== "ONLINE") throw new UiError(400, `Device ${input.deviceId} is ${snap.state}.`);
-      const mainId = test === "smoke" ? "MAIN-01" : "MAIN-05";
+      const mainId = test === "smoke" ? "MAIN-01" : test === "crash-hunt" ? "MAIN-04" : "MAIN-05";
       if (this.devices.getAssignment(mainId)) this.devices.unassign(mainId);
       rt = initializeAgentLab({ devices: [], deviceManager: this.devices, providers: this.providers ?? new ProviderManager(), assignments: { [mainId]: input.deviceId } });
       deviceId = input.deviceId;
@@ -227,7 +252,9 @@ export class UiApp {
       test,
       status: "running",
       startedAt: new Date().toISOString(),
-      params: { package: pkg, objective, maxSteps: parsed.task.maxSteps, timeoutMs: parsed.task.timeoutMs, deviceId },
+      params: hunt
+        ? { package: pkg, objective: `Crash hunt, seed ${hunt.seed}`, maxSteps: hunt.maxActions + hunt.coldStarts * 3 + 4, timeoutMs: hunt.timeoutMs, deviceId }
+        : { package: pkg, objective, maxSteps: parsed.task.maxSteps, timeoutMs: parsed.task.timeoutMs, deviceId },
       events: [],
       screenshots: new Map(),
       abort: new AbortController(),
@@ -262,7 +289,9 @@ export class UiApp {
           run.status = "finished";
           return;
         }
-        const task = await rt.orchestrator.dispatch("MAIN-05", "explore", { objective, app: { packageName: pkg }, maxSteps: parsed.task.maxSteps, timeoutMs: parsed.task.timeoutMs, ...extra }, { signal: run.abort.signal });
+        const task = hunt
+          ? await rt.orchestrator.dispatch("MAIN-04", "crash-hunt", hunt, { signal: run.abort.signal })
+          : await rt.orchestrator.dispatch("MAIN-05", "explore", { objective, app: { packageName: pkg }, maxSteps: parsed.task.maxSteps, timeoutMs: parsed.task.timeoutMs, ...extra }, { signal: run.abort.signal });
         const child = (task.result as AgentResult | undefined)?.children?.[0];
         const result = child?.details as ExplorationResult | undefined;
         run.taskStatus = task.status;
@@ -411,7 +440,8 @@ function demoProviders(): ProviderManager {
   return pm;
 }
 
-function demoDevice(d: MockDevice): void {
+/** `crashButton`: add a "Crash me" button that throws, so the crash-hunt demo has something to find. */
+function demoDevice(d: MockDevice, crashButton = false): void {
   d.screenshotFn = () => {
     const taps = d.trace.filter((t) => t.startsWith("tap:"));
     const m = /^tap:(\d+),(\d+)$/.exec(taps[taps.length - 1] ?? "");
@@ -420,5 +450,16 @@ function demoDevice(d: MockDevice): void {
   d.setUi([
     { text: "Menu", desc: "", id: "com.example.demo:id/menu", cls: "android.widget.Button", pkg: "com.example.demo", clickable: true, enabled: true, bounds: { l: 440, t: 360, r: 640, b: 440 } },
     { text: "Settings", desc: "", id: "com.example.demo:id/settings", cls: "android.widget.Button", pkg: "com.example.demo", clickable: true, enabled: true, bounds: { l: 440, t: 600, r: 640, b: 680 } },
+    ...(crashButton ? [{ text: "Crash me", desc: "", id: "com.example.demo:id/crash", cls: "android.widget.Button", pkg: "com.example.demo", clickable: true, enabled: true, bounds: { l: 440, t: 840, r: 640, b: 920 } }] : []),
   ]);
+  if (!crashButton) return;
+  const tap = d.tap.bind(d);
+  d.tap = async (x, y) => {
+    await tap(x, y);
+    if (x === 540 && y === 880) {
+      d.appendLog("11-20 10:00:00.000  4242  4242 E AndroidRuntime: FATAL EXCEPTION: main");
+      d.appendLog("11-20 10:00:00.001  4242  4242 E AndroidRuntime: Process: com.example.demo, PID: 4242");
+      d.appendLog("11-20 10:00:00.002  4242  4242 E AndroidRuntime: java.lang.IllegalStateException: demo crash behind the 'Crash me' button");
+    }
+  };
 }

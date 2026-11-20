@@ -4,7 +4,7 @@
 - Crash detection is a log-marker match (FATAL EXCEPTION, ANR in, Fatal signal, process died); not a classifier. Logcat is cleared on LAUNCH_APP in the exploration agent and in the smoke handler before launch — MEDIUM — open
 - Persistence: finished REAL web-UI runs are saved to SQLite (node:sqlite, experimental in Node 22); leases/assignments/message bus/library tasks are still in memory — LOW — open
 - Capabilities screen_recording, inspect_ui, network_control (and analysis ones) are declared but have no Device/tool implementation — MEDIUM — open
-- Only 2 of 24 SUB agents have behavior (MAIN-01-B smoke, MAIN-05-A explore); the rest report BLOCKED — LOW — open
+- Only 3 of 24 SUB agents have behavior (MAIN-01-B smoke, MAIN-04-A crash-hunt, MAIN-05-A explore); the rest report BLOCKED — LOW — open
 - No per-task timeout/cancellation in Agent.run — LOW — open
 - Fixed MAIN->device assignment needs up to 12 devices; with fewer, unassigned MAINs are BLOCKED. Dynamic allocation not built — MEDIUM — open
 - Leases and assignments are in memory only; a process crash loses them (a restarted run starts clean, which is safe, but history is lost) — LOW — open
@@ -43,3 +43,4 @@
 - P1 still open: benchmark app with planted bugs vs adb monkey (needs a real device) — MEDIUM — open
 - P2 (all untested on real hardware/live models): vision request shapes follow the documented Anthropic/OpenAI image formats but never hit a live API; crash confirmation replays coordinates blindly (a layout change or timing makes a real crash look NOT_REPRODUCED); screenshots cannot be redacted; text redaction is regex best effort — MEDIUM — open
 - Run history prunes to the newest 50 runs on every save (`RunStore.prune`, tested). `RunStore.delete` exists and is tested but has no UI route yet. `PRAGMA auto_vacuum = INCREMENTAL` is set before the tables so prune hands pages back, but only for databases created after that change; an existing `~/.agentlab/agentlab.db` keeps its old high-water mark until VACUUM — LOW — open
+- Crash Hunter (MAIN-04-A) never run on a real device. Its stress is random over UI controls, not coverage-guided; text input is ASCII only; coordinate taps on screens without a hierarchy bypass the sensitive-control guard; the same crash signature (title+exception+process) at two places is listed once; replay is blind like the explorer's — MEDIUM — open
