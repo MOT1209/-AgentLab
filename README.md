@@ -97,7 +97,7 @@ The UI is Arabic or English (switch at the top). Safety properties: it listens o
 
 ### MCP server (read-only by default)
 
-`npm run mcp -- --mock` (demo) or `npm run mcp` (real adb devices) starts a stdio MCP server so Claude Code, Cursor or any MCP client can look at a device: `list_devices`, `get_ui`, `screenshot`, `get_logs`. The tools that change the device (`launch_app`, `stop_app`, `tap`, `press_key`) exist only with `--allow-actions`. There is no shell, raw adb or code execution tool. Never run on a real device or with a real client yet; screenshots and UI text go to whatever client you connect.
+`npm run --silent mcp -- --mock` (demo) or `npm run --silent mcp` (real adb devices) starts a stdio MCP server so Claude Code, Cursor or any MCP client can look at a device: `list_devices`, `get_ui`, `screenshot`, `get_logs`. The tools that change the device (`launch_app`, `stop_app`, `tap`, `press_key`) exist only with `--allow-actions`. There is no shell, raw adb or code execution tool. Keep `--silent`: stdout carries the protocol, and npm would otherwise print its script banner there first. In a client config you can also build once (`npm run build`) and run `node dist/src/mcp/main.js --mock` directly. Never run on a real device or with a real client yet; screenshots and UI text go to whatever client you connect.
 
 ### Command line
 

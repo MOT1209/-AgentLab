@@ -1,4 +1,6 @@
+import { MockDevice } from "../device/mock-device.js";
 import { Device } from "../device/types.js";
+import { demoScreenshot } from "../ui/demo-png.js";
 
 /**
  * Minimal MCP server (JSON-RPC 2.0, stdio framing is done by main.ts) over the Device abstraction.
@@ -10,13 +12,13 @@ export interface McpServerOptions {
   allowActions?: boolean;
 }
 
-interface Rpc {
+export interface Rpc {
   jsonrpc?: string;
   id?: string | number | null;
   method?: string;
   params?: Record<string, unknown>;
 }
-interface RpcResponse {
+export interface RpcResponse {
   jsonrpc: "2.0";
   id: string | number | null;
   result?: unknown;
@@ -148,6 +150,22 @@ export class McpServer {
     ].filter((t) => opts.allowActions || !t.action);
   }
 
+  /**
+   * One incoming JSON-RPC message: a single request/notification or a batch (an array), which the advertised
+   * 2025-03-26 protocol allows. A batch gets an array of the responses, without entries for notifications;
+   * a batch of only notifications gets no reply at all, and an empty batch is an Invalid Request.
+   */
+  async handleMessage(msg: Rpc | Rpc[]): Promise<RpcResponse | RpcResponse[] | undefined> {
+    if (!Array.isArray(msg)) return this.handle(msg);
+    if (msg.length === 0) return { jsonrpc: "2.0", id: null, error: { code: -32600, message: "Invalid Request: empty batch" } };
+    const replies: RpcResponse[] = [];
+    for (const m of msg) {
+      const r = typeof m === "object" && m !== null && !Array.isArray(m) ? await this.handle(m) : { jsonrpc: "2.0" as const, id: null, error: { code: -32600, message: "Invalid Request" } };
+      if (r) replies.push(r);
+    }
+    return replies.length > 0 ? replies : undefined;
+  }
+
   /** Returns undefined for notifications (no reply expected). */
   async handle(msg: Rpc): Promise<RpcResponse | undefined> {
     const isNotification = msg.id === undefined;
@@ -203,4 +221,11 @@ export class McpServer {
     if (devices.length === 1) return devices[0]!;
     throw new Error(devices.length ? "Several devices connected: pass deviceId (see list_devices)" : "No device connected");
   }
+}
+
+/** The offline device behind `--mock`: its screenshot is a real PNG, so a client can display it. */
+export function createMockDevice(id = "mock-1"): MockDevice {
+  const d = new MockDevice(id);
+  d.screenshotFn = () => demoScreenshot(0);
+  return d;
 }

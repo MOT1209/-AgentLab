@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { McpServer } from "../src/mcp/server.js";
+import { McpServer, createMockDevice } from "../src/mcp/server.js";
 import { MockDevice } from "../src/device/mock-device.js";
 
 const call = (s: McpServer, name: string, args: Record<string, unknown> = {}, id = 1) =>
@@ -42,4 +42,29 @@ test("screenshot returns an image and protocol basics hold", async () => {
   assert.equal(await s.handle({ jsonrpc: "2.0", method: "notifications/initialized" }), undefined);
   const bad: any = await s.handle({ jsonrpc: "2.0", id: 3, method: "nope" });
   assert.equal(bad.error.code, -32601);
+});
+
+test("the --mock device returns real PNG bytes", async () => {
+  const s = new McpServer({ devices: [createMockDevice()] });
+  const shot = await call(s, "screenshot");
+  assert.equal(shot.result.content[0].mimeType, "image/png");
+  const bytes = Buffer.from(shot.result.content[0].data, "base64");
+  assert.deepEqual([...bytes.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+});
+
+test("JSON-RPC batches: one reply per request, none for notifications, empty batch is invalid", async () => {
+  const s = new McpServer({ devices: [new MockDevice("a")] });
+  const r: any = await s.handleMessage([
+    { jsonrpc: "2.0", id: 1, method: "ping" },
+    { jsonrpc: "2.0", method: "notifications/initialized" },
+    { jsonrpc: "2.0", id: 2, method: "nope" },
+  ]);
+  assert.ok(Array.isArray(r));
+  assert.deepEqual(r.map((x: { id: number }) => x.id), [1, 2]);
+  assert.deepEqual(r[0].result, {});
+  assert.equal(r[1].error.code, -32601);
+  assert.equal(await s.handleMessage([{ jsonrpc: "2.0", method: "notifications/initialized" }]), undefined);
+  assert.equal(((await s.handleMessage([])) as any).error.code, -32600);
+  const single: any = await s.handleMessage({ jsonrpc: "2.0", id: 9, method: "ping" });
+  assert.equal(single.id, 9);
 });
