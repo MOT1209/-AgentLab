@@ -203,3 +203,24 @@ test("real smoke run through the UI: no model needed, screenshot kept, result an
   assert.equal((await s.call("GET", "/api/run/report")).json.smoke.status, "PASSED");
   await s.close();
 });
+
+test("demo crash hunt: no model needed, the planted crash is found, confirmed and in the HTML report", async () => {
+  const s = await start();
+  const started = await s.call("POST", "/api/run", { mode: "demo", test: "crash-hunt", maxSteps: 25, seed: 3 });
+  assert.equal(started.status, 202);
+  await waitFor(async () => (await s.call("GET", "/api/state")).json.run.status !== "running", 20_000);
+  const run = (await s.call("GET", "/api/state")).json.run;
+  assert.equal(run.status, "finished");
+  assert.equal(run.test, "crash-hunt");
+  assert.equal(run.result.agentId, "MAIN-04-A");
+  assert.equal(run.result.status, "FAILED");
+  assert.equal(run.result.findings[0].source, "VERIFIED");
+  assert.equal(run.result.findings[0].reproduced, "CONFIRMED");
+  assert.equal(run.result.telemetry.llmCalls, 0);
+  const html = await s.call("GET", "/api/run/report.html?lang=ar");
+  assert.equal(html.status, 200);
+  assert.match(html.buf.toString("utf8"), /FATAL|fatal exception/i);
+  const bad = await s.call("POST", "/api/run", { mode: "demo", test: "crash-hunt", maxSteps: 900 });
+  assert.equal(bad.status, 400);
+  await s.close();
+});

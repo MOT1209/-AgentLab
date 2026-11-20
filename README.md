@@ -51,7 +51,8 @@ Full 36-agent list: [`.claude/skills/ai-testing-lab/knowledge/agents.md`](.claud
 | `AdbDevice` / `AdbDiscovery` / health check | Built. Verified against the **real `adb` binary without a device** (discovery output format, "device not found" failures) and against a **simulated** `adb` script (full pipeline). **Never run on a real phone or emulator.** |
 | `MAIN-01-B` smoke test (install, launch, screenshot, crash-in-logs check) | Built, tested (mock) |
 | `MAIN-05-A` Exploration Agent (LLM-driven loop) | Built, tested (mock device, simulated adb, scripted LLM). **Never run on a real device or with a live LLM.** |
-| The other 22 sub-agents | Registered, **no behavior**. They return `BLOCKED`. |
+| `MAIN-04-A` Crash Hunter (seeded stress, no LLM): cold starts, background/resume, taps on real controls, boundary-value input, swipes, back, relaunch; crashes/ANRs as verified findings with replay confirmation | Built, tested (mock, simulated adb, demo in a headless browser). **Never run on a real device.** |
+| The other 21 sub-agents | Registered, **no behavior**. They return `BLOCKED`. |
 | Local web UI (`npm run ui`): demo run verified in a headless browser; real-device mode never run | Built |
 | Run history (SQLite), HTML report, money cost cap, vision option, crash confirmation by replay | Built, tested with fakes/mocks only. Never run on a real device or with a live model |
 | Multi-user/remote access | **Not built** |
@@ -98,6 +99,18 @@ The UI is Arabic or English (switch at the top). Safety properties: it listens o
 ### Command line
 
 `npm run explore -- --mock` (offline demo) or `npm run explore -- --package com.example.app` (real device + `ANTHROPIC_API_KEY`). It writes `out/<task-id>/report.json` and the screenshots as PNG files. Otherwise AgentLab is a library (`src/index.ts`).
+
+### Crash Hunter (no model, no API key)
+
+`npm run crash-hunt -- --mock` runs an offline demo with a planted crash. On a real device:
+
+```bash
+npm run crash-hunt -- --package com.example.app --seed 42 --max-actions 100
+```
+
+It dispatches `crash-hunt` to `MAIN-04` (sub-agent `MAIN-04-A`) and runs three phases: cold starts (stop, launch, settle), one background/resume, then a **seeded** stress loop over the controls in the UI hierarchy (tap, type boundary values such as `-1`, `2147483648`, `NaN` or 300 characters into text fields, swipe, back, relaunch). The same seed gives the same sequence of actions. After every action the device log is checked; a crash or ANR of the app under test becomes a VERIFIED finding with the log excerpt, a screenshot and the steps since the last relaunch, and the hunt relaunches the app and goes on. At the end each crash (max 3) is replayed once to confirm it.
+
+Controls that read as buy/pay/subscribe/delete account/factory reset/uninstall are never tapped unless you pass `--allow-sensitive`. Text input is ASCII only (stock `adb input text`). Screens with no UI hierarchy (games, canvases) get taps at random coordinates, which the sensitive-control guard cannot see. In the web UI choose *Crash Hunter* as the test type; it works in demo mode too.
 
 ### Web UI details
 
@@ -357,11 +370,13 @@ AgentLab is for testing applications and games you own or are authorized to test
 
 ## Roadmap (next)
 
-1. A real run on a real device/emulator (see *Real Android Device Testing*), and fix what breaks.
-2. Vision input (send screenshots to the model) for games and canvas-heavy apps.
-3. Cost budget per run/provider.
-4. Run reports (JSON/Markdown) and persistence.
-5. More sub-agent behaviors (Crash Hunter, Edge Case Agent first); dynamic device allocation if you have fewer than 12 devices.
+1. A real run on a real device/emulator (see *Real Android Device Testing*), and fix what breaks. This is the biggest open risk.
+2. A benchmark app with planted bugs: compare the Crash Hunter and the Exploration Agent against `adb monkey`.
+3. More sub-agent behaviors, one at a time: Edge Case Agent (`MAIN-05-B`) and Stability Tester (`MAIN-04-B`) are the closest to existing code.
+4. Dynamic device allocation for fewer than 12 devices.
+5. MCP tools, only when a skill needs them.
+
+Done since the first roadmap: vision input, cost cap, run history and HTML report (P2), Crash Hunter (P3).
 
 ## License
 

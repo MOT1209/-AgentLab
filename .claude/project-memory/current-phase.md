@@ -1,5 +1,16 @@
 # CURRENT PHASE
 
+P3 (first item) — Crash Hunter done. MAIN-04-A (Crash & Stability Tester / Crash Hunter) handles `crash-hunt`
+(src/agents/behaviors/crash-hunter.ts): deterministic, seeded, NO LLM. Phases: cold starts, background/resume, stress over UI
+controls (tap, boundary-value TYPE in text fields, swipe, back, relaunch; coordinate taps when there is no hierarchy).
+Crash/ANR -> VERIFIED finding (log excerpt + screenshot + repro steps since the last relaunch), app relaunched, hunt continues;
+duplicates counted, not re-listed. Crash replay was extracted from the explorer into src/agents/exploration/crash-confirm.ts
+(shared, `startStepOf` limits the replay to the crash's segment). Sensitive controls are skipped unless allowSensitiveActions.
+MAIN-04-A capabilities extended with type/swipe/press_key/inspect_ui. CLI `npm run crash-hunt -- --mock|--package`; web UI test
+type "Crash Hunter" (demo and real; demo plants a crash behind a "Crash me" button). 213 tests pass (+15), 2 skipped. Demo checked
+in headless Chromium (AR). Never run on a real device.
+Next: real device run; benchmark app vs adb monkey; then Edge Case Agent (MAIN-05-B) or Stability Tester (MAIN-04-B).
+
 Merge - the separate branch claude/vibrant-wozniak-a93k2e (unrelated history, same Phase 1-4 code) is now on this line: its 3 new commits were
 cherry-picked (explore example, local web UI in src/ui, Phase 4.5 real-device path: health gating, structured errors, task-level maxLlmCalls,
 evidence on disk, opt-in real-device test). Reconciled with Phase 5/6: ONE budget mechanism (task maxLlmCalls clamped by the agent profile ceiling;

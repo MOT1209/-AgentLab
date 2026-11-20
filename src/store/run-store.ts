@@ -8,7 +8,7 @@ export interface StoredRun {
   startedAt: string;
   finishedAt?: string;
   mode: "demo" | "real";
-  test: "explore" | "smoke";
+  test: "explore" | "smoke" | "crash-hunt";
   packageName: string;
   /** Exploration status or task status for smoke. */
   status: string;
@@ -83,7 +83,7 @@ export class RunStore {
       id: r.id as string,
       startedAt: r.started_at as string,
       ...(r.finished_at ? { finishedAt: r.finished_at as string } : {}),
-      test: r.test as "explore" | "smoke",
+      test: r.test as "explore" | "smoke" | "crash-hunt",
       packageName: r.package as string,
       status: r.status as string,
       summary: (r.summary as string).slice(0, 200),
@@ -99,7 +99,7 @@ export class RunStore {
       startedAt: r.started_at as string,
       ...(r.finished_at ? { finishedAt: r.finished_at as string } : {}),
       mode: r.mode as "demo" | "real",
-      test: r.test as "explore" | "smoke",
+      test: r.test as "explore" | "smoke" | "crash-hunt",
       packageName: r.package as string,
       status: r.status as string,
       summary: r.summary as string,
