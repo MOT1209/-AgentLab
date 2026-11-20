@@ -15,5 +15,6 @@ export { DEFAULT_BEHAVIORS } from "./behaviors/index.js";
 export { smokeHandler, type SmokePayload } from "./behaviors/smoke.js";
 export { crashHuntHandler, parseCrashHuntTask, runCrashHunt, seededRandom, EDGE_INPUTS, type CrashHuntTask, type CrashHuntDeps } from "./behaviors/crash-hunter.js";
 export { edgeCaseHandler, parseEdgeCaseTask, runEdgeCases, type EdgeCaseTask, type EdgeCaseDeps, type EdgeCaseRecord, type EdgeCaseOutcome } from "./behaviors/edge-case.js";
+export { stabilityHandler, parseStabilityTask, runStability, analyzeMemory, type StabilityTask, type StabilityDeps, type StabilityMetrics, type CycleRecord, type MemoryVerdict, type MemorySample } from "./behaviors/stability.js";
 export { DeterministicSession, type CommonTaskOptions, type SummaryFacts } from "./behaviors/deterministic-session.js";
 export * from "./exploration/index.js";

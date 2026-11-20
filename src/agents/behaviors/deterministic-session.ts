@@ -205,6 +205,13 @@ export class DeterministicSession {
     return [...this.occurrences.values()].reduce((n, c) => n + c, 0);
   }
 
+  /** How many times each crash finding's kind was seen (first occurrence included), by finding id. */
+  occurrencesByFinding(): Map<string, number> {
+    const out = new Map<string, number>();
+    for (const [key, id] of this.findingOfKey) out.set(id, this.occurrences.get(key) ?? 0);
+    return out;
+  }
+
   /** Starts a new segment: crashes found from here on are reproduced from this step. */
   startSegment(): void {
     this.segmentStart = this.tel.actions + 1;

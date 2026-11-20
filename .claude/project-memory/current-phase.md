@@ -1,5 +1,15 @@
 # CURRENT PHASE
 
+P3 (third item) — Stability Tester done. MAIN-04-B handles `stability` (src/agents/behaviors/stability.ts) on DeterministicSession,
+NO LLM. Cold cycles (STOP, LAUNCH, settle): crash rate per finding (session.occurrencesByFinding) + launch command wall time
+(info only). Warm cycles (HOME, settle, LAUNCH as resume, settle, memoryKb): analyzeMemory judges the longest uninterrupted
+series (>=6 samples): median(last 3) vs median(first 3) >= pct AND >= MB AND positive least-squares slope -> VERIFIED MEDIUM
+finding with the PSS series as evidence. New optional Device.memoryKb (AdbDevice: dumpsys meminfo via parseMeminfo; MockDevice:
+memoryFn; fake adb: setMeminfo). MAIN-04-B capabilities + device_info, press_key, screenshot; profile now CORE/QA/CRASH/EXPLORE
+(DEVICE_INTERACT for HOME, explorer limits for long runs). confirmCrashes defaults to false here. Cycles are cut to fit the 200-step
+ceiling. CLI `npm run stability`, web UI test type "Stability". 247 tests pass, 2 skipped. Never run on a real device.
+Next: real device run of all agents; benchmark app vs adb monkey.
+
 P3 (second item) — Edge Case Agent done. MAIN-05-B handles `edge-case` (src/agents/behaviors/edge-case.ts): deterministic, NO LLM.
 Survey of the start screen (text fields, submit control by EN/DE/AR label, sensitive ones skipped), then cases, each from a
 clean STOP/LAUNCH: field x input matrix (EDGE_INPUTS or caller's ASCII list) and sequences (double submit, empty submit, back

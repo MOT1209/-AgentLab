@@ -33,7 +33,7 @@ const SUB_GRANTS: Readonly<Record<string, Grant>> = {
   "MAIN-03-A": g([CORE, QA], ["agentlab-visual-testing"]),
   "MAIN-03-B": g([CORE, QA], ["agentlab-visual-testing"]),
   "MAIN-04-A": g([CORE, QA, CRASH, EXPLORE]),
-  "MAIN-04-B": g([CORE, QA, CRASH]),
+  "MAIN-04-B": g([CORE, QA, CRASH, EXPLORE]),
   "MAIN-05-A": g([CORE, QA, CRASH, EXPLORE]),
   "MAIN-05-B": g([CORE, QA, CRASH, EXPLORE]),
   "MAIN-06-A": g([CORE, QA], ["agentlab-performance"]),

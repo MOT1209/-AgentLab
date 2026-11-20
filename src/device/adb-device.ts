@@ -112,6 +112,9 @@ export class AdbDevice implements Device {
     if (!code) throw new DeviceError(`unsupported key: ${String(key)}`, this.id);
     await this.adb(["shell", "input", "keyevent", code]);
   }
+  async memoryKb(p: string): Promise<number | undefined> {
+    return parseMeminfo(String(await this.adb(["shell", "dumpsys", "meminfo", this.pkg(p)])));
+  }
   async clearLogs(): Promise<void> {
     await this.adb(["logcat", "-c"]);
   }
@@ -125,6 +128,16 @@ export class AdbDevice implements Device {
 }
 
 /** emulator-5554 -> EMULATOR, 192.168.1.5:5555 -> REMOTE, anything else -> PHYSICAL. */
+/**
+ * Total PSS in KB from `dumpsys meminfo <pkg>`. Android 10+ prints "TOTAL PSS:   123456  TOTAL RSS: ...",
+ * older versions a table row "TOTAL   123456 ...". Undefined when the process is not running or the format is unknown.
+ */
+export function parseMeminfo(text: string): number | undefined {
+  if (/No process found/i.test(text)) return undefined;
+  const m = /TOTAL PSS:\s+(\d+)/.exec(text) ?? /^\s*TOTAL\s+(\d+)/m.exec(text);
+  return m ? Number(m[1]) : undefined;
+}
+
 export function adbSourceOf(serial: string): DeviceSource {
   if (serial.startsWith("emulator-")) return "EMULATOR";
   if (serial.includes(":")) return "REMOTE";

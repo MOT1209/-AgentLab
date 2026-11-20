@@ -49,7 +49,7 @@ const SPEC: readonly MainSpec[] = [
     description: "Finds crashes, ANRs and instability under repeated use.",
     subs: [
       { name: "Crash Hunter", role: "crash-hunting", description: "Provokes and captures crashes and ANRs with evidence.", capabilities: ["launch_app", "stop_app", "tap", "type", "swipe", "press_key", "screenshot", "inspect_ui", "logs"] },
-      { name: "Stability Tester", role: "stability-testing", description: "Runs long and repeated sessions to find degradation.", capabilities: ["launch_app", "stop_app", "logs", "screen_recording"] },
+      { name: "Stability Tester", role: "stability-testing", description: "Runs long and repeated sessions to find degradation.", capabilities: ["launch_app", "stop_app", "logs", "device_info", "press_key", "screenshot", "screen_recording"] },
     ],
   },
   {

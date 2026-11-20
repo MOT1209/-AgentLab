@@ -53,7 +53,8 @@ Full 36-agent list: [`.claude/skills/ai-testing-lab/knowledge/agents.md`](.claud
 | `MAIN-05-A` Exploration Agent (LLM-driven loop) | Built, tested (mock device, simulated adb, scripted LLM). **Never run on a real device or with a live LLM.** |
 | `MAIN-04-A` Crash Hunter (seeded stress, no LLM): cold starts, background/resume, taps on real controls, boundary-value input, swipes, back, relaunch; crashes/ANRs as verified findings with replay confirmation | Built, tested (mock, simulated adb, demo in a headless browser). **Never run on a real device.** |
 | `MAIN-05-B` Edge Case Agent (no LLM): every boundary value in every text field of the start screen, each case from a clean launch, plus unusual sequences (double submit, back during submit, empty submit, rapid relaunch, background during input, back past the root, rapid taps); each crash pinned to one field and input | Built, tested (mock, simulated adb, demo in a headless browser). **Never run on a real device.** |
-| The other 20 sub-agents | Registered, **no behavior**. They return `BLOCKED`. |
+| `MAIN-04-B` Stability Tester (no LLM): repeated cold starts (intermittent crashes with their rate, launch command time) and warm resumes with the process alive (memory PSS per resume; steady growth is reported as a possible leak) | Built, tested (mock, simulated adb, demo in a headless browser). **Never run on a real device.** |
+| The other 19 sub-agents | Registered, **no behavior**. They return `BLOCKED`. |
 | Local web UI (`npm run ui`): demo run verified in a headless browser; real-device mode never run | Built |
 | Run history (SQLite), HTML report, money cost cap, vision option, crash confirmation by replay | Built, tested with fakes/mocks only. Never run on a real device or with a live model |
 | Multi-user/remote access | **Not built** |
@@ -131,6 +132,21 @@ It dispatches `edge-case` to `MAIN-05` (sub-agent `MAIN-05-B`). It looks at the 
 - **sequences**: double submit, submit empty, back right after submit, rapid relaunch ×3, background during input, back past the root, rapid taps on each control.
 
 Every case gets an outcome (`OK`, `CRASH`, `LEFT_APP`, `FIELD_GONE`) and the result lists them under `cases`. A crash names the field and input (or the sequence) that caused it; its repro steps are that case only, and it is replayed once to confirm. The same task gives the same actions. Limits: only the start screen's fields; fields are not cleared (each case relaunches instead); ASCII input only; the agent's step ceiling (200 actions) stops new cases. In the web UI choose *Edge cases*.
+
+### Stability Tester (no model, no API key)
+
+`npm run stability -- --mock` runs an offline demo (an app that leaks 6 MB per resume and crashes on one launch). On a real device:
+
+```bash
+npm run stability -- --package com.example.app --cold 10 --warm 30
+```
+
+It dispatches `stability` to `MAIN-04` (sub-agent `MAIN-04-B`):
+
+- **cold cycles** (stop, launch, settle): crashes that happen only sometimes are reported once, with how often they happened (`F-001 in 3 of 40 cycles`); the launch command time is recorded (adb round trip, not time to first frame, so it is information only, never a finding);
+- **warm cycles** (home, settle, resume, settle): the process stays alive and its memory is read after each resume (`dumpsys meminfo`, total PSS). When the median of the last 3 samples is at least 25% **and** 15 MB above the median of the first 3, with a rising trend, it is reported as a possible leak (MEDIUM). A crash restarts the process and starts a new memory series; the longest one is judged.
+
+Crashes are not replayed by default (`--confirm` turns it on): an intermittent crash rarely recurs in one replay, and its rate is the evidence. The result has `metrics` (every cycle, the memory verdict, launch times, crash rates). The agent's 200-action ceiling allows about 10 cold + 40 warm cycles; larger requests are cut down and the summary says so. In the web UI choose *Stability*.
 
 ### Web UI details
 
@@ -392,11 +408,11 @@ AgentLab is for testing applications and games you own or are authorized to test
 
 1. A real run on a real device/emulator (see *Real Android Device Testing*), and fix what breaks. This is the biggest open risk.
 2. A benchmark app with planted bugs: compare the Crash Hunter and the Exploration Agent against `adb monkey`.
-3. More sub-agent behaviors, one at a time: Stability Tester (`MAIN-04-B`) is the closest to existing code.
+3. More sub-agent behaviors, one at a time, where a customer needs them (e.g. Startup & Loading Agent `MAIN-06-B` on top of the stability cycles).
 4. Dynamic device allocation for fewer than 12 devices.
 5. MCP tools, only when a skill needs them.
 
-Done since the first roadmap: vision input, cost cap, run history and HTML report (P2), Crash Hunter and Edge Case Agent (P3).
+Done since the first roadmap: vision input, cost cap, run history and HTML report (P2), Crash Hunter, Edge Case Agent and Stability Tester (P3).
 
 ## License
 
