@@ -25,7 +25,7 @@ Source of truth in code: `src/agents/organization.ts`. A test keeps this file in
 ## MAIN-05 Exploratory Tester
 
 - MAIN-05-A Exploration Agent
-- MAIN-05-B Edge Case Agent
+- MAIN-05-B Edge Case Agent — behavior: `edge-case` (src/agents/behaviors/edge-case.ts), input/sequence matrix, no LLM
 
 ## MAIN-06 Performance Tester
 

@@ -5,6 +5,7 @@ import type { ExplorationResult } from "../agents/exploration/result.js";
 import { initializeAgentLab } from "../bootstrap.js";
 import { demoScreenshot } from "./demo-png.js";
 import { parseCrashHuntTask, type CrashHuntTask } from "../agents/behaviors/crash-hunter.js";
+import { parseEdgeCaseTask, type EdgeCaseTask } from "../agents/behaviors/edge-case.js";
 import { MockProvider } from "../providers/mock-provider.js";
 import { ProviderManager } from "../providers/manager.js";
 import type { ProviderConfig } from "../providers/types.js";
@@ -39,7 +40,8 @@ export interface ProviderInput {
 export interface RunInput {
   mode: "demo" | "real";
   /**
-   * "explore" (LLM-driven, default), "crash-hunt" (seeded stress, no LLM; demo or real) or
+   * "explore" (LLM-driven, default), "crash-hunt" (seeded stress, no LLM; demo or real),
+   * "edge-case" (boundary-value and sequence matrix, no LLM; demo or real) or
    * "smoke" (install, launch, crash check; no LLM; real device only).
    */
   test?: TestKind;
@@ -88,7 +90,7 @@ interface RunState {
   abort: AbortController;
 }
 
-export type TestKind = "explore" | "smoke" | "crash-hunt";
+export type TestKind = "explore" | "smoke" | "crash-hunt" | "edge-case";
 const MAX_EVENTS = 1000;
 /** Retention: finished real runs kept in SQLite; older ones are pruned on every save. */
 const MAX_STORED_RUNS = 50;
@@ -187,7 +189,7 @@ export class UiApp {
   startRun(input: RunInput): { id: string } {
     if (this.run?.status === "running") throw new UiError(409, "A run is already in progress.");
     const demo = input.mode === "demo";
-    const test: TestKind = input.test === "smoke" ? "smoke" : input.test === "crash-hunt" ? "crash-hunt" : "explore";
+    const test: TestKind = input.test === "smoke" || input.test === "crash-hunt" || input.test === "edge-case" ? input.test : "explore";
     if (test === "smoke" && demo) throw new UiError(400, "The smoke test needs a real device.");
     const apkPath = (input.apkPath ?? "").trim();
     if (test === "smoke" && (!apkPath || apkPath.startsWith("-") || !/\.apk$/i.test(apkPath))) throw new UiError(400, "APK path is required and must end in .apk.");
@@ -221,6 +223,18 @@ export class UiApp {
       if (!h.ok) throw new UiError(400, h.errors.join("; "));
       hunt = h.task;
     }
+    let edge: EdgeCaseTask | undefined;
+    if (test === "edge-case") {
+      const e = parseEdgeCaseTask({
+        app: { packageName: pkg },
+        maxCases: input.maxSteps ?? (demo ? 12 : 80),
+        timeoutMs: input.timeoutMs ?? 600_000,
+        // The demo form has two fields; two inputs keep it short. Real runs use the full boundary-value list.
+        ...(demo ? { inputs: ["abc", "-1"] } : {}),
+      });
+      if (!e.ok) throw new UiError(400, e.errors.join("; "));
+      edge = e.task;
+    }
 
     let rt;
     let deviceId: string;
@@ -230,6 +244,10 @@ export class UiApp {
         demoDevice(fleet[3]!, true);
         rt = initializeAgentLab({ devices: fleet });
         deviceId = "DEVICE-04 (demo)";
+      } else if (edge) {
+        demoForm(fleet[4]!);
+        rt = initializeAgentLab({ devices: fleet });
+        deviceId = "DEVICE-05 (demo)";
       } else {
         demoDevice(fleet[4]!);
         rt = initializeAgentLab({ devices: fleet, providers: demoProviders() });
@@ -254,6 +272,8 @@ export class UiApp {
       startedAt: new Date().toISOString(),
       params: hunt
         ? { package: pkg, objective: `Crash hunt, seed ${hunt.seed}`, maxSteps: hunt.maxActions + hunt.coldStarts * 3 + 4, timeoutMs: hunt.timeoutMs, deviceId }
+        : edge
+        ? { package: pkg, objective: `Edge cases, up to ${edge.maxCases} case(s)`, maxSteps: edge.maxCases * 7 + 3, timeoutMs: edge.timeoutMs, deviceId }
         : { package: pkg, objective, maxSteps: parsed.task.maxSteps, timeoutMs: parsed.task.timeoutMs, deviceId },
       events: [],
       screenshots: new Map(),
@@ -291,6 +311,8 @@ export class UiApp {
         }
         const task = hunt
           ? await rt.orchestrator.dispatch("MAIN-04", "crash-hunt", hunt, { signal: run.abort.signal })
+          : edge
+          ? await rt.orchestrator.dispatch("MAIN-05", "edge-case", edge, { signal: run.abort.signal })
           : await rt.orchestrator.dispatch("MAIN-05", "explore", { objective, app: { packageName: pkg }, maxSteps: parsed.task.maxSteps, timeoutMs: parsed.task.timeoutMs, ...extra }, { signal: run.abort.signal });
         const child = (task.result as AgentResult | undefined)?.children?.[0];
         const result = child?.details as ExplorationResult | undefined;
@@ -461,5 +483,38 @@ function demoDevice(d: MockDevice, crashButton = false): void {
       d.appendLog("11-20 10:00:00.001  4242  4242 E AndroidRuntime: Process: com.example.demo, PID: 4242");
       d.appendLog("11-20 10:00:00.002  4242  4242 E AndroidRuntime: java.lang.IllegalStateException: demo crash behind the 'Crash me' button");
     }
+  };
+}
+
+/** Demo for the edge-case test: a form with "Name" and "Age" fields and a Save button; saving with age -1 crashes. */
+function demoForm(d: MockDevice): void {
+  d.screenshotFn = () => {
+    const taps = d.trace.filter((t) => t.startsWith("tap:"));
+    const m = /^tap:(\d+),(\d+)$/.exec(taps[taps.length - 1] ?? "");
+    return demoScreenshot(d.trace.length, m ? { x: Number(m[1]), y: Number(m[2]) } : undefined);
+  };
+  const node = (id: string, text: string, cls: string, t: number) => ({ text, desc: "", id: `com.example.demo:id/${id}`, cls, pkg: "com.example.demo", clickable: true, enabled: true, bounds: { l: 340, t, r: 740, b: t + 80 } });
+  d.setUi([node("name", "", "android.widget.EditText", 360), node("age", "", "android.widget.EditText", 600), node("save", "Save", "android.widget.Button", 840)]);
+  let focused = "";
+  let age = "";
+  const { tap, type, stop } = { tap: d.tap.bind(d), type: d.type.bind(d), stop: d.stop.bind(d) };
+  d.stop = async (p) => {
+    await stop(p);
+    age = "";
+    focused = "";
+  };
+  d.tap = async (x, y) => {
+    await tap(x, y);
+    if (y === 640) focused = "age";
+    else if (y === 400) focused = "name";
+    else if (y === 880 && age === "-1") {
+      d.appendLog("11-20 10:00:00.000  4242  4242 E AndroidRuntime: FATAL EXCEPTION: main");
+      d.appendLog("11-20 10:00:00.001  4242  4242 E AndroidRuntime: Process: com.example.demo, PID: 4242");
+      d.appendLog("11-20 10:00:00.002  4242  4242 E AndroidRuntime: java.lang.IllegalArgumentException: age must not be negative (demo)");
+    }
+  };
+  d.type = async (t) => {
+    await type(t);
+    if (focused === "age") age += t;
   };
 }

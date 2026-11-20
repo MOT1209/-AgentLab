@@ -48,7 +48,7 @@ test("MAIN-05 -> MAIN-05-A explores on MAIN-05's leased device and releases it",
   assert.deepEqual([child.agentId, child.status], ["MAIN-05-A", "PASSED"]);
 });
 
-test("MAIN-05-B has no exploration behavior and stays BLOCKED", async () => {
+test("MAIN-05-B has no exploration behavior (it handles edge-case instead)", async () => {
   const { registry } = build(script());
   assert.equal(registry.require("MAIN-05-B").canHandle("explore"), false);
   assert.equal(registry.require("MAIN-05-A").canHandle("explore"), true);

@@ -112,7 +112,7 @@ export function createUiServer(app: UiApp, opts: UiServerOptions): Server {
           ...(num(b.outputPrice) !== undefined ? { outputPrice: num(b.outputPrice)! } : {}),
           ...(b.vision === true ? { vision: true } : {}),
           ...(b.confirmCrashes === true ? { confirmCrashes: true } : {}),
-          ...(b.test === "smoke" ? { test: "smoke" as const } : b.test === "crash-hunt" ? { test: "crash-hunt" as const } : {}),
+          ...(b.test === "smoke" || b.test === "crash-hunt" || b.test === "edge-case" ? { test: b.test } : {}),
           ...(num(b.seed) !== undefined ? { seed: num(b.seed)! } : {}),
           ...(typeof b.apkPath === "string" ? { apkPath: b.apkPath } : {}),
           ...(typeof b.package === "string" ? { package: b.package } : {}),
