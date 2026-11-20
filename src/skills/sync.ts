@@ -21,9 +21,13 @@ export interface SyncPlan {
 
 const skillsDir = (root: string, target: SkillTarget) => join(root, SKILL_TARGETS[target]);
 
+/**
+ * Line endings are normalized to LF: a Windows checkout with core.autocrlf turns every generated file into CRLF,
+ * which would otherwise read as a hand edit (hash mismatch) on Windows only. .gitattributes pins LF as well.
+ */
 function read(path: string): string | undefined {
   try {
-    return readFileSync(path, "utf8");
+    return readFileSync(path, "utf8").replace(/\r\n/g, "\n");
   } catch {
     return undefined;
   }

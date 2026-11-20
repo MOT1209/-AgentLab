@@ -376,6 +376,18 @@ test("sync: the committed .claude and .agent directories match the catalog exact
   assert.deepEqual(plan.orphans, []);
 });
 
+test("sync: a CRLF checkout (Windows core.autocrlf) is in sync, not a hand edit", () => {
+  const root = scratch();
+  try {
+    applySync(planSync(system.registry, root));
+    for (const e of planSync(system.registry, root).entries) writeFileSync(e.path, readFileSync(e.path, "utf8").replace(/\n/g, "\r\n"));
+    assert.deepEqual(validateFiles(system.registry, root), []);
+    assert.ok(planSync(system.registry, root).entries.every((e) => e.status === "ok"));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("sync: writes missing files, is idempotent, and detects drift and hand edits", () => {
   const root = scratch();
   try {

@@ -1,0 +1,5 @@
+# Check text files out with LF on every platform. The generated SKILL.md files carry a content hash,
+# and a CRLF checkout (Windows core.autocrlf) would otherwise read as a hand edit.
+* text=auto eol=lf
+*.png binary
+*.apk binary
