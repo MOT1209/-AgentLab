@@ -96,6 +96,10 @@ The UI is Arabic or English (switch at the top). Safety properties: it listens o
 
 > The real-device path has never been run on real hardware. Expect to hit errors and send them back.
 
+### MCP server (read-only by default)
+
+`npm run --silent mcp -- --mock` (demo) or `npm run --silent mcp` (real adb devices) starts a stdio MCP server so Claude Code, Cursor or any MCP client can look at a device: `list_devices`, `get_ui`, `screenshot`, `get_logs`. The tools that change the device (`launch_app`, `stop_app`, `tap`, `press_key`) exist only with `--allow-actions`. There is no shell, raw adb or code execution tool. Keep `--silent`: stdout carries the protocol, and npm would otherwise print its script banner there first. In a client config you can also build once (`npm run build`) and run `node dist/src/mcp/main.js --mock` directly. Never run on a real device or with a real client yet; screenshots and UI text go to whatever client you connect.
+
 ### Command line
 
 `npm run explore -- --mock` (offline demo) or `npm run explore -- --package com.example.app` (real device + `ANTHROPIC_API_KEY`). It writes `out/<task-id>/report.json` and the screenshots as PNG files. Otherwise AgentLab is a library (`src/index.ts`).
