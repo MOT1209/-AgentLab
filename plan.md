@@ -95,3 +95,76 @@ Zuerst fehlschlagender Test, dann `npm test` (rund 200 Tests ohne Netzwerk) und 
 
 ### Risiken
 Phase 0 kann tiefere Probleme aufdecken (uiautomator auf Geräten einzelner Hersteller) und die Reihenfolge ändern; sie läuft deshalb zuerst, danach wird neu geplant. Das Entfernen der Hierarchie (Phase 3) ist erst nach dem Entscheidungstor sicher. Kein Responsively-Code darf kopiert werden (AGPL gegen MIT).
+
+---
+
+## أفكار من ARTEMIS / Ideen aus ARTEMIS
+
+### العربية
+
+**المصدر:** [google/artemis](https://github.com/google/artemis) (Python، Apache-2.0، نحو 150 ألف سطر). ننقل **الأفكار فقط** ونعيد كتابتها بـ TypeScript، ولا ننسخ كوداً.
+
+**الخلاصة:** ARTEMIS لا يحل مشكلتنا الأولى (لم يعمل AgentLab على جهاز حقيقي بعد)، لذلك تبقى المرحلة 0 أولاً. لكنه يقدّم حلولاً لثلاث نقاط ضعف موثقة في `known-issues.md`:
+- **الضغط بإحداثيات عمياء:** لا شيء يتأكد أن العنصر ما زال في مكانه لحظة الضغط.
+- **حارس اللمسات الحساسة لا يلتقط الضغط بالإحداثيات الحرة.**
+- **الرؤية ترسل لقطة الشاشة في كل خطوة** (`task.vision`)، فتزيد التكلفة بلا ضرورة.
+
+#### الأفكار مرتبة حسب الأولوية
+
+| # | الفكرة | الأصل في ARTEMIS | أين تدخل عندنا | الحجم |
+|---|---|---|---|---|
+| A1 | **إدراك موثوق:** انتظار نحو 0.4 ثانية بعد كل إجراء حتى تستقر الشاشة. إعادة المحاولة بملف على `/sdcard` إذا رجع `uiautomator dump` فارغاً، ومعاملة الشجرة الفارغة كخطأ | `graph/perception.py`، `drivers/android/hierarchy.py` | `src/device/adb-device.ts` (`ui()`)، مع المرحلة 0 | صغير |
+| A2 | **فهرس الشاشة والضغط برقم العنصر:** رقم لكل عنصر في الـ prompt، والنموذج يختار "العنصر 7" بدل الإحداثيات. بحث تقريبي بالنص، ومعرفة العنصر تحت نقطة | `agents/explorer/screen_index.py` | `observation.ts`، `prompt.ts`، `actions.ts` | متوسط |
+| A3 | **فحص الهدف قبل التنفيذ:** قبل كل TAP نقرأ الواجهة من جديد ونتأكد أن العنصر موجود. تصحيح تلقائي للانزياح الصغير، وإلا تصنيف (تحرّك / مغطّى / اختفى) وإرجاعه للنموذج | `agents/validator/precondition_xml.py` | `action-executor.ts`، `sensitive-actions.ts` | متوسط |
+| A4 | **الرؤية عند الحاجة فقط:** إرسال اللقطة فقط عندما تكون الشجرة فقيرة (عناصر قليلة، WebView، Canvas، لعبة)، مع رسم أرقام العناصر أو نقطة الهدف عليها | `perception.py`، `precondition_pixel.py` | `exploration-agent.ts` (طلب القرار) | متوسط |
+| A5 | **ذاكرة خطوات مضغوطة:** ملخص قصير لكل خطوة بدل التاريخ الكامل، لتبقى الجلسات الطويلة ضمن السقف | `memory/step_memory.py` | `decision.ts`، `prompt.ts` | متوسط |
+| A6 | **وكيل تشخيص للقراءة فقط:** بعد العطل يربط logcat باللقطات والخطوات ويخرج بسبب محتمل. لا يلمس الجهاز أبداً | `agents/diagnoser`، `agents/log_analyzer` | أحد الوكلاء الفرعيين الذين يرجعون BLOCKED، والأقرب MAIN-10 | متوسط |
+| A7 | **تسجيل فيديو حول العطل** عبر `screenrecord`. القدرة `screen_recording` معلنة لكنها غير منفذة | `drivers/android/recorder.py` | `record?()` اختيارية في `src/device/types.ts` | صغير ومتوسط |
+| A8 | **تحويل الاستكشاف إلى اختبار:** المسار المؤكد يصبح سكربت يُعاد تشغيله، أساس وكيل Regression | فكرة `mcp_server/rules.md` | المرحلة 4 | كبير، لاحقاً |
+
+#### ما لن نأخذه
+- **LangGraph وLangChain والتبعيات الثقيلة:** تتعارض مع تبعية التشغيل الواحدة عندنا.
+- **`execute_shell` في الـ driver:** يخالف قاعدة "لا shell خام للنموذج".
+- **التثبيت التلقائي لإعدادات MCP والقواعد في محررات المستخدم:** تعديل خارج المشروع.
+- **تطبيق المساعد (Accessibility Helper APK):** مؤجل. نعود إليه فقط إذا فشل `uiautomator` على الأجهزة الحقيقية في المرحلة 0.
+- **لجنة النماذج المتعددة وأجهزة السحابة:** أكبر من حاجة أداة شخصية.
+
+#### الترتيب
+1. **مع المرحلة 0:** A1.
+2. **بعد إثبات الجهاز:** A2 ثم A3 (A3 تعتمد على A2، وتغلق ثغرة اللمسات الحساسة بالإحداثيات).
+3. **بعدها:** A4 ثم A5، مع قياس التكلفة والجودة على لعبة أو WebView.
+4. **لاحقاً:** A6 وA7، ثم A8 ضمن المرحلة 4.
+
+كل فكرة تبدأ باختبار يفشل وتنتهي بنجاح `npm test` و`npm run skills:validate`.
+
+---
+
+### Deutsch
+
+**Quelle:** [google/artemis](https://github.com/google/artemis) (Python, Apache-2.0, rund 150.000 Zeilen). Wir übernehmen **nur Ideen** und schreiben sie in TypeScript neu; kein Code wird kopiert.
+
+**Fazit:** ARTEMIS löst unser erstes Problem nicht (AgentLab lief noch nie auf einem echten Gerät), Phase 0 bleibt also zuerst. Es bietet aber Lösungen für drei dokumentierte Schwächen aus `known-issues.md`: blinde Koordinaten-Taps ohne Prüfung zum Ausführungszeitpunkt, den Schutz vor sensiblen Taps, der freie Koordinaten nicht erfasst, und Vision, die bei jedem Schritt einen Screenshot sendet (`task.vision`).
+
+#### Ideen nach Priorität
+
+| # | Idee | Herkunft in ARTEMIS | Ort bei uns | Umfang |
+|---|---|---|---|---|
+| A1 | **Zuverlässige Wahrnehmung:** rund 0,4 s warten, bis der Bildschirm ruhig ist; bei leerem `uiautomator dump` über eine Datei auf `/sdcard` wiederholen; leere Hierarchie als Fehler werten | `graph/perception.py`, `drivers/android/hierarchy.py` | `src/device/adb-device.ts` (`ui()`), mit Phase 0 | klein |
+| A2 | **Bildschirmindex und Tap per Elementnummer:** jedes Element bekommt im Prompt eine Nummer, das Modell wählt „Element 7" statt Koordinaten; unscharfe Textsuche und Treffertest per Punkt | `agents/explorer/screen_index.py` | `observation.ts`, `prompt.ts`, `actions.ts` | mittel |
+| A3 | **Zielprüfung vor der Ausführung:** vor jedem TAP UI neu lesen; kleine Verschiebungen selbst korrigieren, sonst einstufen (verschoben / verdeckt / verschwunden) und ans Modell zurückgeben | `agents/validator/precondition_xml.py` | `action-executor.ts`, `sensitive-actions.ts` | mittel |
+| A4 | **Vision nur bei Bedarf:** Screenshot nur bei schwacher Hierarchie (wenige Elemente, WebView, Canvas, Spiel), mit eingezeichneten Elementnummern oder Zielpunkt | `perception.py`, `precondition_pixel.py` | `exploration-agent.ts` (Entscheidungsanfrage) | mittel |
+| A5 | **Komprimiertes Schrittgedächtnis:** kurze Zusammenfassung pro Schritt statt voller Historie, damit lange Läufe im Limit bleiben | `memory/step_memory.py` | `decision.ts`, `prompt.ts` | mittel |
+| A6 | **Diagnose-Agent, nur lesend:** verknüpft nach einem Absturz logcat, Screenshots und Schritte zu einer wahrscheinlichen Ursache; berührt das Gerät nie | `agents/diagnoser`, `agents/log_analyzer` | ein heute BLOCKED-Sub-Agent, am ehesten MAIN-10 | mittel |
+| A7 | **Videoaufnahme rund um den Absturz** per `screenrecord`; die Fähigkeit `screen_recording` ist deklariert, aber nicht umgesetzt | `drivers/android/recorder.py` | optionales `record?()` in `src/device/types.ts` | klein bis mittel |
+| A8 | **Erkundung zu Test machen:** ein bestätigter Pfad wird zu einem wiederabspielbaren Skript, Basis eines Regression-Agenten | Idee aus `mcp_server/rules.md` | Phase 4 | groß, später |
+
+#### Was wir nicht übernehmen
+LangGraph/LangChain und schwere Abhängigkeiten (gegen unsere eine Laufzeitabhängigkeit); `execute_shell` im Treiber (gegen „keine rohe Shell für das Modell"); automatische Installation von MCP-Konfiguration und Regeln in Editoren des Nutzers (Änderung außerhalb des Projekts); die Accessibility-Helper-APK (zurückgestellt, nur falls `uiautomator` in Phase 0 auf echten Geräten scheitert); Modell-Komitee und Cloud-Geräte (zu groß für ein persönliches Werkzeug).
+
+#### Reihenfolge
+1. **Mit Phase 0:** A1.
+2. **Nach dem Gerätenachweis:** A2, dann A3 (A3 baut auf A2 auf und schließt die Lücke bei sensiblen Koordinaten-Taps).
+3. **Danach:** A4, dann A5, mit Messung von Kosten und Qualität an einem Spiel oder WebView.
+4. **Später:** A6 und A7, dann A8 innerhalb von Phase 4.
+
+Jede Idee beginnt mit einem fehlschlagenden Test und endet mit grünem `npm test` und `npm run skills:validate`.
